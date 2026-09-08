@@ -1,24 +1,23 @@
 {
-    "name": "RoomInventory - Sistem Inventaris Ruangan",
-    "short_name": "RoomInventory",
+    "name": "Sistem Inventaris Ruangan",
+    "short_name": "Inventaris",
     "description": "Sistem Inventaris Ruangan berbasis PWA",
+    "lang": "id-ID",
     "start_url": "index.html",
     "scope": "",
     "display": "standalone",
     "orientation": "portrait-primary",
-    "background_color": "#070a12",
-    "theme_color": "#7c3aed",
-    "lang": "id-ID",
-
+    "background_color": "#020617",
+    "theme_color": "#0f172a",
     "icons": [
         {
-            "src": "icons/icon-192.png",
+            "src": "icon/logo 1.jpeg",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "icons/icon-512.png",
+            "src": "icon/logo 1.jpeg",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
