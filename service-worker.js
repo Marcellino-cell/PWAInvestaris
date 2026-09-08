@@ -1,5 +1,5 @@
 const CACHE_NAME =
-    "room-inventory-v5-3";
+    "room-inventory-v5-4";
 
 const APP_FILES = [
 
@@ -11,10 +11,14 @@ const APP_FILES = [
 
     "manifest.json",
 
-    "icons/logo.png"
+    "icon/logo 1.jpeg"
 
 ];
 
+
+/* =========================================================
+   INSTALL
+========================================================= */
 
 self.addEventListener(
     "install",
@@ -26,6 +30,7 @@ self.addEventListener(
                 .open(
                     CACHE_NAME
                 )
+
                 .then(
                     function (cache) {
 
@@ -36,13 +41,23 @@ self.addEventListener(
                     }
                 )
 
-        );
+                .then(
+                    function () {
 
-        self.skipWaiting();
+                        return self.skipWaiting();
+
+                    }
+                )
+
+        );
 
     }
 );
 
+
+/* =========================================================
+   ACTIVATE
+========================================================= */
 
 self.addEventListener(
     "activate",
@@ -52,12 +67,14 @@ self.addEventListener(
 
             caches
                 .keys()
+
                 .then(
                     function (keys) {
 
                         return Promise.all(
 
                             keys
+
                                 .filter(
                                     function (key) {
 
@@ -68,6 +85,7 @@ self.addEventListener(
 
                                     }
                                 )
+
                                 .map(
                                     function (key) {
 
@@ -83,24 +101,36 @@ self.addEventListener(
                     }
                 )
 
-        );
+                .then(
+                    function () {
 
-        self.clients.claim();
+                        return self.clients.claim();
+
+                    }
+                )
+
+        );
 
     }
 );
 
+
+/* =========================================================
+   FETCH
+========================================================= */
 
 self.addEventListener(
     "fetch",
     function (event) {
 
         if (
-            event.request.method !== "GET"
+            event.request.method !==
+            "GET"
         ) {
-            return;
-        }
 
+            return;
+
+        }
 
         event.respondWith(
 
@@ -108,17 +138,20 @@ self.addEventListener(
                 .match(
                     event.request
                 )
+
                 .then(
                     function (cached) {
 
                         if (cached) {
-                            return cached;
-                        }
 
+                            return cached;
+
+                        }
 
                         return fetch(
                             event.request
                         )
+
                         .then(
                             function (response) {
 
@@ -131,15 +164,15 @@ self.addEventListener(
                                     const copy =
                                         response.clone();
 
-
                                     caches
                                         .open(
                                             CACHE_NAME
                                         )
+
                                         .then(
                                             function (cache) {
 
-                                                cache.put(
+                                                return cache.put(
                                                     event.request,
                                                     copy
                                                 );
@@ -149,11 +182,11 @@ self.addEventListener(
 
                                 }
 
-
                                 return response;
 
                             }
                         )
+
                         .catch(
                             function () {
 
@@ -171,7 +204,8 @@ self.addEventListener(
                                 return new Response(
                                     "",
                                     {
-                                        status: 503
+                                        status:
+                                            503
                                     }
                                 );
 
