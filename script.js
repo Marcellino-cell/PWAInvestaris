@@ -1,7 +1,13 @@
+/* =========================================================
+   SISTEM INVENTARIS RUANGAN
+   FULL JAVASCRIPT V5.4
+========================================================= */
+
 const STORAGE_KEY = "roomInventoryData_v53";
 const THEME_KEY = "roomInventoryTheme_v53";
 const ACTIVITY_KEY = "roomInventoryActivity_v53";
 const AUTO_BACKUP_KEY = "roomInventoryAutoBackup_v53";
+
 const AUTH_KEY = "roomInventoryAdminAuth_v53";
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "admin123";
@@ -14,19 +20,32 @@ const OLD_STORAGE_KEYS = [
 
 let inventoryData = [];
 let activityData = [];
+
 let editingId = null;
 let confirmCallback = null;
+
 let deferredInstallPrompt = null;
 let isAdminLoggedIn = false;
+
+
+/* =========================================================
+   HELPER
+========================================================= */
 
 function $(id) {
     return document.getElementById(id);
 }
 
+
+/* =========================================================
+   INIT
+========================================================= */
+
 document.addEventListener(
     "DOMContentLoaded",
     init
 );
+
 
 function init() {
 
@@ -71,6 +90,7 @@ function init() {
 
 }
 
+
 /* =========================================================
    LOAD DATA
 ========================================================= */
@@ -83,6 +103,7 @@ function loadData() {
             localStorage.getItem(
                 STORAGE_KEY
             );
+
 
         if (!saved) {
 
@@ -103,11 +124,13 @@ function loadData() {
                     );
 
                     break;
+
                 }
 
             }
 
         }
+
 
         inventoryData =
             saved
@@ -118,7 +141,10 @@ function loadData() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "Load data error:",
+            error
+        );
 
         inventoryData = [];
 
@@ -126,11 +152,13 @@ function loadData() {
 
 }
 
+
 function normalizeData(data) {
 
     if (!Array.isArray(data)) {
         return [];
     }
+
 
     return data.map(
         function (item, index) {
@@ -212,6 +240,7 @@ function normalizeData(data) {
 
 }
 
+
 function normalizeCondition(value) {
 
     const valueString =
@@ -219,6 +248,7 @@ function normalizeCondition(value) {
             value ||
             "Baik"
         ).toLowerCase();
+
 
     if (
         valueString === "ringan" ||
@@ -229,6 +259,7 @@ function normalizeCondition(value) {
 
     }
 
+
     if (
         valueString === "berat" ||
         valueString.includes("berat")
@@ -238,9 +269,11 @@ function normalizeCondition(value) {
 
     }
 
+
     return "Baik";
 
 }
+
 
 /* =========================================================
    SAVE
@@ -248,14 +281,31 @@ function normalizeCondition(value) {
 
 function saveData() {
 
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(
-            inventoryData
-        )
-    );
+    try {
+
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(
+                inventoryData
+            )
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Save data error:",
+            error
+        );
+
+        showToast(
+            "Data gagal disimpan ke browser.",
+            "error"
+        );
+
+    }
 
 }
+
 
 /* =========================================================
    AUTHENTICATION / ADMIN LOGIN
@@ -268,9 +318,11 @@ function loadAuth() {
             AUTH_KEY
         ) === "logged-in";
 
+
     updateAuthUI();
 
 }
+
 
 function updateAuthUI() {
 
@@ -278,6 +330,7 @@ function updateAuthUI() {
         "admin-logged-in",
         isAdminLoggedIn
     );
+
 
     const buttonText =
         $("loginButtonText");
@@ -288,6 +341,7 @@ function updateAuthUI() {
     const button =
         $("loginButton");
 
+
     if (isAdminLoggedIn) {
 
         if (buttonText) {
@@ -297,6 +351,7 @@ function updateAuthUI() {
 
         }
 
+
         if (statusDot) {
 
             statusDot.classList.add(
@@ -305,10 +360,16 @@ function updateAuthUI() {
 
         }
 
+
         if (button) {
 
             button.title =
                 "Logout Admin";
+
+            button.setAttribute(
+                "aria-label",
+                "Logout Admin"
+            );
 
         }
 
@@ -321,6 +382,7 @@ function updateAuthUI() {
 
         }
 
+
         if (statusDot) {
 
             statusDot.classList.remove(
@@ -329,16 +391,23 @@ function updateAuthUI() {
 
         }
 
+
         if (button) {
 
             button.title =
                 "Login Admin";
+
+            button.setAttribute(
+                "aria-label",
+                "Login Admin"
+            );
 
         }
 
     }
 
 }
+
 
 function openLoginModal() {
 
@@ -350,6 +419,7 @@ function openLoginModal() {
 
     }
 
+
     if ($("loginError")) {
 
         $("loginError").textContent =
@@ -357,12 +427,20 @@ function openLoginModal() {
 
     }
 
+
     $("loginForm")?.reset();
+
 
     $("loginModal")
         ?.classList.add(
             "show"
         );
+
+
+    document.body.classList.add(
+        "modal-open"
+    );
+
 
     setTimeout(
         function () {
@@ -371,10 +449,11 @@ function openLoginModal() {
                 ?.focus();
 
         },
-        100
+        120
     );
 
 }
+
 
 function closeLoginModal() {
 
@@ -382,6 +461,12 @@ function closeLoginModal() {
         ?.classList.remove(
             "show"
         );
+
+
+    document.body.classList.remove(
+        "modal-open"
+    );
+
 
     if ($("loginError")) {
 
@@ -392,9 +477,11 @@ function closeLoginModal() {
 
 }
 
+
 function handleLoginSubmit(event) {
 
     event.preventDefault();
+
 
     const username =
         $("loginUsername")
@@ -402,37 +489,49 @@ function handleLoginSubmit(event) {
             .trim() ||
         "";
 
+
     const password =
         $("loginPassword")
             ?.value ||
         "";
 
+
     if (
-        username ===
-            ADMIN_USERNAME &&
-        password ===
-            ADMIN_PASSWORD
+        username === ADMIN_USERNAME &&
+        password === ADMIN_PASSWORD
     ) {
 
-        isAdminLoggedIn = true;
+        isAdminLoggedIn =
+            true;
+
 
         localStorage.setItem(
             AUTH_KEY,
             "logged-in"
         );
 
+
         updateAuthUI();
 
         closeLoginModal();
 
+
         showToast(
-            "Login admin berhasil. Mode edit aktif.",
+            "Login admin berhasil. Mode pengelolaan data aktif.",
             "success"
         );
+
+
+        addActivity(
+            "Admin login",
+            "fa-right-to-bracket"
+        );
+
 
         return;
 
     }
+
 
     if ($("loginError")) {
 
@@ -440,6 +539,7 @@ function handleLoginSubmit(event) {
             "Username atau password salah.";
 
     }
+
 
     if ($("loginPassword")) {
 
@@ -452,26 +552,41 @@ function handleLoginSubmit(event) {
 
 }
 
+
 function logoutAdmin() {
 
-    isAdminLoggedIn = false;
+    isAdminLoggedIn =
+        false;
+
 
     localStorage.removeItem(
         AUTH_KEY
     );
 
+
     updateAuthUI();
+
 
     closeInventoryModal();
 
+    closeLoginModal();
+
     closeConfirmModal();
+
 
     showToast(
         "Logout berhasil. Data kembali terkunci.",
         "info"
     );
 
+
+    addActivity(
+        "Admin logout",
+        "fa-right-from-bracket"
+    );
+
 }
+
 
 function requireAdmin(
     action = "melakukan perubahan data"
@@ -483,16 +598,20 @@ function requireAdmin(
 
     }
 
+
     showToast(
         `Silakan login admin untuk ${action}.`,
         "error"
     );
 
+
     openLoginModal();
+
 
     return false;
 
 }
+
 
 /* =========================================================
    EVENTS
@@ -508,11 +627,13 @@ function bindEvents() {
             openLoginModal
         );
 
+
     $("closeLoginButton")
         ?.addEventListener(
             "click",
             closeLoginModal
         );
+
 
     $("cancelLoginButton")
         ?.addEventListener(
@@ -520,11 +641,13 @@ function bindEvents() {
             closeLoginModal
         );
 
+
     $("loginForm")
         ?.addEventListener(
             "submit",
             handleLoginSubmit
         );
+
 
     $("loginModal")
         ?.addEventListener(
@@ -542,6 +665,7 @@ function bindEvents() {
 
             }
         );
+
 
     /* NAVIGATION */
 
@@ -566,6 +690,7 @@ function bindEvents() {
             }
         );
 
+
     /* MOBILE MENU */
 
     $("mobileMenuButton")
@@ -581,6 +706,7 @@ function bindEvents() {
             }
         );
 
+
     /* THEME */
 
     $("themeButton")
@@ -589,11 +715,13 @@ function bindEvents() {
             toggleTheme
         );
 
+
     $("mobileThemeButton")
         ?.addEventListener(
             "click",
             toggleTheme
         );
+
 
     /* ADD */
 
@@ -603,11 +731,13 @@ function bindEvents() {
             openAddModal
         );
 
+
     $("heroAddButton")
         ?.addEventListener(
             "click",
             openAddModal
         );
+
 
     $("inventoryAddButton")
         ?.addEventListener(
@@ -615,11 +745,13 @@ function bindEvents() {
             openAddModal
         );
 
+
     $("emptyAddButton")
         ?.addEventListener(
             "click",
             openAddModal
         );
+
 
     /* MONITOR */
 
@@ -635,7 +767,8 @@ function bindEvents() {
             }
         );
 
-    /* MODAL */
+
+    /* INVENTORY MODAL */
 
     $("closeModalButton")
         ?.addEventListener(
@@ -643,17 +776,20 @@ function bindEvents() {
             closeInventoryModal
         );
 
+
     $("cancelModalButton")
         ?.addEventListener(
             "click",
             closeInventoryModal
         );
 
+
     $("inventoryForm")
         ?.addEventListener(
             "submit",
             handleFormSubmit
         );
+
 
     /* SEARCH */
 
@@ -663,11 +799,13 @@ function bindEvents() {
             renderInventory
         );
 
+
     $("roomFilter")
         ?.addEventListener(
             "change",
             renderInventory
         );
+
 
     $("conditionFilter")
         ?.addEventListener(
@@ -675,17 +813,20 @@ function bindEvents() {
             renderInventory
         );
 
+
     $("sortFilter")
         ?.addEventListener(
             "change",
             renderInventory
         );
 
+
     $("resetFilterButton")
         ?.addEventListener(
             "click",
             resetFilters
         );
+
 
     /* CONFIRM */
 
@@ -695,6 +836,7 @@ function bindEvents() {
             closeConfirmModal
         );
 
+
     $("confirmYes")
         ?.addEventListener(
             "click",
@@ -703,7 +845,9 @@ function bindEvents() {
                 const callback =
                     confirmCallback;
 
+
                 closeConfirmModal();
+
 
                 if (
                     typeof callback ===
@@ -717,6 +861,7 @@ function bindEvents() {
             }
         );
 
+
     /* EXPORT */
 
     $("exportButton")
@@ -725,6 +870,7 @@ function bindEvents() {
             exportCSV
         );
 
+
     /* BACKUP */
 
     $("backupButton")
@@ -732,6 +878,7 @@ function bindEvents() {
             "click",
             createBackup
         );
+
 
     /* RESTORE */
 
@@ -746,11 +893,13 @@ function bindEvents() {
             }
         );
 
+
     $("restoreFileInput")
         ?.addEventListener(
             "change",
             handleRestore
         );
+
 
     /* PRINT */
 
@@ -764,6 +913,7 @@ function bindEvents() {
             }
         );
 
+
     /* CLEAR ACTIVITY */
 
     $("clearActivityButton")
@@ -772,7 +922,8 @@ function bindEvents() {
             clearActivities
         );
 
-    /* INSTALL PWA */
+
+    /* INSTALL */
 
     window.addEventListener(
         "beforeinstallprompt",
@@ -783,6 +934,7 @@ function bindEvents() {
             deferredInstallPrompt =
                 event;
 
+
             $("installButton")
                 ?.classList.remove(
                     "hidden"
@@ -791,11 +943,13 @@ function bindEvents() {
         }
     );
 
+
     $("installButton")
         ?.addEventListener(
             "click",
             installPWA
         );
+
 
     /* ESC */
 
@@ -808,13 +962,14 @@ function bindEvents() {
                 "Escape"
             ) {
 
+                closeLoginModal();
+
                 closeInventoryModal();
 
                 closeConfirmModal();
 
-                closeLoginModal();
-
             }
+
 
             if (
                 (
@@ -827,6 +982,7 @@ function bindEvents() {
 
                 event.preventDefault();
 
+
                 $("searchInput")
                     ?.focus();
 
@@ -835,7 +991,8 @@ function bindEvents() {
         }
     );
 
-    /* MODAL OUTSIDE CLICK */
+
+    /* INVENTORY MODAL OUTSIDE CLICK */
 
     $("inventoryModal")
         ?.addEventListener(
@@ -853,6 +1010,9 @@ function bindEvents() {
 
             }
         );
+
+
+    /* CONFIRM MODAL OUTSIDE CLICK */
 
     $("confirmModal")
         ?.addEventListener(
@@ -873,6 +1033,7 @@ function bindEvents() {
 
 }
 
+
 /* =========================================================
    NAVIGATION
 ========================================================= */
@@ -882,11 +1043,13 @@ function switchSection(target) {
     const section =
         $(target);
 
+
     if (!section) {
 
         return;
 
     }
+
 
     document
         .querySelectorAll(
@@ -902,9 +1065,11 @@ function switchSection(target) {
             }
         );
 
+
     section.classList.add(
         "active-section"
     );
+
 
     document
         .querySelectorAll(
@@ -922,24 +1087,21 @@ function switchSection(target) {
             }
         );
 
+
     $("sidebar")
         ?.classList.remove(
             "open"
         );
 
-    if (
-        target ===
-        "inventory"
-    ) {
+
+    if (target === "inventory") {
 
         renderInventory();
 
     }
 
-    if (
-        target ===
-        "monitoring"
-    ) {
+
+    if (target === "monitoring") {
 
         updateMonitoring();
 
@@ -947,16 +1109,23 @@ function switchSection(target) {
 
     }
 
-    if (
-        target ===
-        "statistics"
-    ) {
+
+    if (target === "statistics") {
 
         renderStatistics();
 
     }
 
+
+    window.scrollTo(
+        {
+            top: 0,
+            behavior: "smooth"
+        }
+    );
+
 }
+
 
 /* =========================================================
    MODAL
@@ -974,27 +1143,40 @@ function openAddModal() {
 
     }
 
-    editingId = null;
+
+    editingId =
+        null;
+
 
     $("modalTitle").textContent =
         "Tambah Inventaris";
 
-    $("inventoryForm")
-        ?.reset();
+
+    $("inventoryForm").reset();
+
 
     $("inventoryId").value =
         "";
 
+
     $("inventoryQuantity").value =
         "1";
 
+
     $("inventoryCondition").value =
         "Baik";
+
 
     $("inventoryModal")
         ?.classList.add(
             "show"
         );
+
+
+    document.body.classList.add(
+        "modal-open"
+    );
+
 
     setTimeout(
         function () {
@@ -1008,6 +1190,7 @@ function openAddModal() {
 
 }
 
+
 function openEditModal(id) {
 
     if (
@@ -1020,57 +1203,81 @@ function openEditModal(id) {
 
     }
 
+
     const item =
         inventoryData.find(
             function (entry) {
 
-                return entry.id ===
-                    id;
+                return entry.id === id;
 
             }
         );
 
+
     if (!item) {
+
+        showToast(
+            "Data inventaris tidak ditemukan.",
+            "error"
+        );
 
         return;
 
     }
 
-    editingId = id;
+
+    editingId =
+        id;
+
 
     $("modalTitle").textContent =
         "Edit Inventaris";
 
+
     $("inventoryId").value =
         item.id;
+
 
     $("inventoryCode").value =
         item.kodeInventaris;
 
+
     $("inventoryName").value =
         item.nama;
+
 
     $("inventoryCategory").value =
         item.kategori;
 
+
     $("inventoryRoom").value =
         item.ruangan;
+
 
     $("inventoryQuantity").value =
         item.jumlah;
 
+
     $("inventoryCondition").value =
         item.kondisi;
 
+
     $("inventoryNotes").value =
         item.keterangan;
+
 
     $("inventoryModal")
         ?.classList.add(
             "show"
         );
 
+
+    document.body.classList.add(
+        "modal-open"
+    );
+
 }
+
 
 function closeInventoryModal() {
 
@@ -1079,15 +1286,26 @@ function closeInventoryModal() {
             "show"
         );
 
-    editingId = null;
+
+    document.body.classList.remove(
+        "modal-open"
+    );
+
+
+    editingId =
+        null;
 
 }
 
+
 /* =========================================================
-   FORM
+   FORM SUBMIT
 ========================================================= */
 
 function handleFormSubmit(event) {
+
+    event.preventDefault();
+
 
     if (
         !requireAdmin(
@@ -1099,42 +1317,54 @@ function handleFormSubmit(event) {
 
     }
 
-    event.preventDefault();
 
     const code =
         $("inventoryCode")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
+
 
     const name =
         $("inventoryName")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
+
 
     const category =
         $("inventoryCategory")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
+
 
     const room =
         $("inventoryRoom")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
+
 
     const quantity =
         Number(
             $("inventoryQuantity")
-                .value
+                ?.value
         );
+
 
     const condition =
         $("inventoryCondition")
-            .value;
+            ?.value ||
+        "Baik";
+
 
     const notes =
         $("inventoryNotes")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
+
 
     if (
         !code ||
@@ -1152,6 +1382,7 @@ function handleFormSubmit(event) {
 
     }
 
+
     if (
         !Number.isFinite(quantity) ||
         quantity < 0
@@ -1166,6 +1397,7 @@ function handleFormSubmit(event) {
 
     }
 
+
     const duplicate =
         inventoryData.find(
             function (item) {
@@ -1174,12 +1406,12 @@ function handleFormSubmit(event) {
                     item.kodeInventaris
                         .toLowerCase() ===
                     code.toLowerCase() &&
-                    item.id !==
-                    editingId
+                    item.id !== editingId
                 );
 
             }
         );
+
 
     if (duplicate) {
 
@@ -1192,23 +1424,33 @@ function handleFormSubmit(event) {
 
     }
 
+
     if (editingId) {
 
         const index =
             inventoryData.findIndex(
                 function (item) {
 
-                    return item.id ===
-                        editingId;
+                    return (
+                        item.id ===
+                        editingId
+                    );
 
                 }
             );
 
+
         if (index === -1) {
+
+            showToast(
+                "Data tidak ditemukan.",
+                "error"
+            );
 
             return;
 
         }
+
 
         inventoryData[index] = {
 
@@ -1240,10 +1482,12 @@ function handleFormSubmit(event) {
 
         };
 
+
         addActivity(
             `Mengubah "${name}"`,
             "fa-pen"
         );
+
 
         showToast(
             "Data berhasil diperbarui.",
@@ -1286,10 +1530,12 @@ function handleFormSubmit(event) {
 
         });
 
+
         addActivity(
             `Menambahkan "${name}"`,
             "fa-plus"
         );
+
 
         showToast(
             "Inventaris berhasil ditambahkan.",
@@ -1297,6 +1543,7 @@ function handleFormSubmit(event) {
         );
 
     }
+
 
     saveData();
 
@@ -1306,8 +1553,9 @@ function handleFormSubmit(event) {
 
 }
 
+
 /* =========================================================
-   RENDER
+   RENDER ALL
 ========================================================= */
 
 function renderAll() {
@@ -1330,6 +1578,7 @@ function renderAll() {
 
 }
 
+
 /* =========================================================
    INVENTORY
 ========================================================= */
@@ -1339,31 +1588,41 @@ function renderInventory() {
     const tbody =
         $("inventoryTableBody");
 
+
     if (!tbody) {
 
         return;
 
     }
 
+
     const search =
         (
-            $("searchInput")?.value ||
+            $("searchInput")
+                ?.value ||
             ""
         )
         .toLowerCase()
         .trim();
 
+
     const room =
-        $("roomFilter")?.value ||
+        $("roomFilter")
+            ?.value ||
         "all";
+
 
     const condition =
-        $("conditionFilter")?.value ||
+        $("conditionFilter")
+            ?.value ||
         "all";
 
+
     const sort =
-        $("sortFilter")?.value ||
+        $("sortFilter")
+            ?.value ||
         "newest";
+
 
     let result =
         inventoryData.filter(
@@ -1373,24 +1632,36 @@ function renderInventory() {
                     !search ||
                     item.kodeInventaris
                         .toLowerCase()
-                        .includes(search) ||
+                        .includes(
+                            search
+                        ) ||
                     item.nama
                         .toLowerCase()
-                        .includes(search) ||
+                        .includes(
+                            search
+                        ) ||
                     item.kategori
                         .toLowerCase()
-                        .includes(search) ||
+                        .includes(
+                            search
+                        ) ||
                     item.ruangan
                         .toLowerCase()
-                        .includes(search);
+                        .includes(
+                            search
+                        );
+
 
                 const roomMatch =
                     room === "all" ||
                     item.ruangan === room;
 
+
                 const conditionMatch =
                     condition === "all" ||
-                    item.kondisi === condition;
+                    item.kondisi ===
+                    condition;
+
 
                 return (
                     searchMatch &&
@@ -1401,6 +1672,7 @@ function renderInventory() {
             }
         );
 
+
     result.sort(
         function (a, b) {
 
@@ -1409,39 +1681,60 @@ function renderInventory() {
                 case "oldest":
 
                     return (
-                        new Date(a.tanggal) -
-                        new Date(b.tanggal)
+                        new Date(
+                            a.tanggal
+                        ) -
+                        new Date(
+                            b.tanggal
+                        )
                     );
+
 
                 case "nameAsc":
 
-                    return a.nama.localeCompare(
-                        b.nama,
-                        "id"
+                    return (
+                        a.nama.localeCompare(
+                            b.nama,
+                            "id"
+                        )
                     );
+
 
                 case "nameDesc":
 
-                    return b.nama.localeCompare(
-                        a.nama,
-                        "id"
+                    return (
+                        b.nama.localeCompare(
+                            a.nama,
+                            "id"
+                        )
                     );
+
 
                 case "stockHigh":
 
-                    return b.jumlah -
-                        a.jumlah;
+                    return (
+                        b.jumlah -
+                        a.jumlah
+                    );
+
 
                 case "stockLow":
 
-                    return a.jumlah -
-                        b.jumlah;
+                    return (
+                        a.jumlah -
+                        b.jumlah
+                    );
+
 
                 default:
 
                     return (
-                        new Date(b.tanggal) -
-                        new Date(a.tanggal)
+                        new Date(
+                            b.tanggal
+                        ) -
+                        new Date(
+                            a.tanggal
+                        )
                     );
 
             }
@@ -1449,7 +1742,10 @@ function renderInventory() {
         }
     );
 
-    tbody.innerHTML = "";
+
+    tbody.innerHTML =
+        "";
+
 
     result.forEach(
         function (item) {
@@ -1459,16 +1755,16 @@ function renderInventory() {
                     "tr"
                 );
 
+
             const conditionClass =
                 item.kondisi.toLowerCase();
+
 
             row.innerHTML = `
 
                 <td>
 
-                    <span
-                        class="code-badge"
-                    >
+                    <span class="code-badge">
 
                         ${escapeHtml(
                             item.kodeInventaris
@@ -1478,47 +1774,41 @@ function renderInventory() {
 
                 </td>
 
+
                 <td>
 
                     <strong>
-
                         ${escapeHtml(
                             item.nama
                         )}
-
                     </strong>
 
                 </td>
 
-                <td>
 
+                <td>
                     ${escapeHtml(
                         item.kategori
                     )}
-
                 </td>
 
-                <td>
 
+                <td>
                     ${escapeHtml(
                         item.ruangan
                     )}
-
                 </td>
+
 
                 <td>
-
                     ${item.jumlah}
-
                 </td>
+
 
                 <td>
 
                     <span
-                        class="
-                            condition-badge
-                            ${conditionClass}
-                        "
+                        class="condition-badge ${conditionClass}"
                     >
 
                         ${conditionLabel(
@@ -1529,53 +1819,41 @@ function renderInventory() {
 
                 </td>
 
-                <td>
 
+                <td>
                     ${formatDate(
                         item.tanggal
                     )}
-
                 </td>
+
 
                 <td>
 
-                    <div
-                        class="action-buttons"
-                    >
+                    <div class="action-buttons">
 
                         <button
-                            class="
-                                icon-button
-                                edit-button
-                            "
+                            class="icon-button edit-button"
                             type="button"
-                            title="Edit"
+                            title="Edit inventaris"
+                            aria-label="Edit inventaris"
                         >
 
                             <i
-                                class="
-                                    fa-solid
-                                    fa-pen
-                                "
+                                class="fa-solid fa-pen"
                             ></i>
 
                         </button>
 
+
                         <button
-                            class="
-                                icon-button
-                                delete
-                                delete-button
-                            "
+                            class="icon-button delete delete-button"
                             type="button"
-                            title="Hapus"
+                            title="Hapus inventaris"
+                            aria-label="Hapus inventaris"
                         >
 
                             <i
-                                class="
-                                    fa-solid
-                                    fa-trash
-                                "
+                                class="fa-solid fa-trash"
                             ></i>
 
                         </button>
@@ -1586,9 +1864,10 @@ function renderInventory() {
 
             `;
 
+
             row.querySelector(
                 ".edit-button"
-            ).addEventListener(
+            )?.addEventListener(
                 "click",
                 function () {
 
@@ -1599,9 +1878,10 @@ function renderInventory() {
                 }
             );
 
+
             row.querySelector(
                 ".delete-button"
-            ).addEventListener(
+            )?.addEventListener(
                 "click",
                 function () {
 
@@ -1612,6 +1892,7 @@ function renderInventory() {
                 }
             );
 
+
             tbody.appendChild(
                 row
             );
@@ -1619,12 +1900,14 @@ function renderInventory() {
         }
     );
 
+
     if ($("resultCount")) {
 
         $("resultCount").textContent =
             result.length;
 
     }
+
 
     if (
         result.length === 0
@@ -1646,6 +1929,7 @@ function renderInventory() {
 
 }
 
+
 /* =========================================================
    DELETE
 ========================================================= */
@@ -1662,50 +1946,61 @@ function deleteInventory(id) {
 
     }
 
+
     const item =
         inventoryData.find(
             function (entry) {
 
-                return entry.id ===
-                    id;
+                return entry.id === id;
 
             }
         );
 
+
     if (!item) {
+
+        showToast(
+            "Data inventaris tidak ditemukan.",
+            "error"
+        );
 
         return;
 
     }
 
+
     createAutoBackup();
 
+
     openConfirmModal(
-
         "Hapus Inventaris",
-
         `Yakin ingin menghapus "${item.nama}"?`,
-
         function () {
 
             inventoryData =
                 inventoryData.filter(
                     function (entry) {
 
-                        return entry.id !==
-                            id;
+                        return (
+                            entry.id !==
+                            id
+                        );
 
                     }
                 );
 
+
             saveData();
+
 
             addActivity(
                 `Menghapus "${item.nama}"`,
                 "fa-trash"
             );
 
+
             renderAll();
+
 
             showToast(
                 "Data berhasil dihapus.",
@@ -1713,10 +2008,10 @@ function deleteInventory(id) {
             );
 
         }
-
     );
 
 }
+
 
 /* =========================================================
    DASHBOARD
@@ -1727,12 +2022,14 @@ function updateDashboard() {
     const total =
         inventoryData.length;
 
+
     const good =
         inventoryData.filter(
             item =>
                 item.kondisi ===
                 "Baik"
         ).length;
+
 
     const attention =
         inventoryData.filter(
@@ -1741,19 +2038,26 @@ function updateDashboard() {
                 "Baik"
         ).length;
 
+
     const totalStock =
         inventoryData.reduce(
-            function (sum, item) {
+            function (
+                sum,
+                item
+            ) {
 
-                return sum +
+                return (
+                    sum +
                     Number(
                         item.jumlah ||
                         0
-                    );
+                    )
+                );
 
             },
             0
         );
+
 
     const rooms =
         new Set(
@@ -1763,6 +2067,7 @@ function updateDashboard() {
             )
         ).size;
 
+
     const categories =
         new Set(
             inventoryData.map(
@@ -1770,6 +2075,7 @@ function updateDashboard() {
                     item.kategori
             )
         ).size;
+
 
     const lowStock =
         inventoryData.filter(
@@ -1779,69 +2085,70 @@ function updateDashboard() {
                 ) <= 2
         ).length;
 
+
     if ($("totalItems")) {
 
-        $("totalItems")
-            .textContent =
+        $("totalItems").textContent =
             total;
 
     }
 
+
     if ($("goodItems")) {
 
-        $("goodItems")
-            .textContent =
+        $("goodItems").textContent =
             good;
 
     }
 
+
     if ($("attentionItems")) {
 
-        $("attentionItems")
-            .textContent =
+        $("attentionItems").textContent =
             attention;
 
     }
 
+
     if ($("totalStock")) {
 
-        $("totalStock")
-            .textContent =
+        $("totalStock").textContent =
             totalStock;
 
     }
 
+
     if ($("totalRooms")) {
 
-        $("totalRooms")
-            .textContent =
+        $("totalRooms").textContent =
             rooms;
 
     }
 
+
     if ($("totalCategories")) {
 
-        $("totalCategories")
-            .textContent =
+        $("totalCategories").textContent =
             categories;
 
     }
 
+
     if ($("lowStockCount")) {
 
-        $("lowStockCount")
-            .textContent =
+        $("lowStockCount").textContent =
             lowStock;
 
     }
 
+
     if ($("terminalTotal")) {
 
-        $("terminalTotal")
-            .textContent =
+        $("terminalTotal").textContent =
             total;
 
     }
+
 
     updateHealth();
 
@@ -1851,22 +2158,42 @@ function updateDashboard() {
 
 }
 
+
+/* =========================================================
+   HEALTH
+========================================================= */
+
 function updateHealth() {
 
     if (!inventoryData.length) {
 
-        $("dataHealth").textContent =
-            "0%";
+        if ($("dataHealth")) {
 
-        $("healthPercent").textContent =
-            "0%";
+            $("dataHealth").textContent =
+                "0%";
 
-        $("healthProgress").style.width =
-            "0%";
+        }
+
+
+        if ($("healthPercent")) {
+
+            $("healthPercent").textContent =
+                "0%";
+
+        }
+
+
+        if ($("healthProgress")) {
+
+            $("healthProgress").style.width =
+                "0%";
+
+        }
 
         return;
 
     }
+
 
     const complete =
         inventoryData.filter(
@@ -1882,6 +2209,7 @@ function updateHealth() {
             }
         ).length;
 
+
     const percent =
         Math.round(
             complete /
@@ -1889,27 +2217,49 @@ function updateHealth() {
             100
         );
 
-    $("dataHealth").textContent =
-        `${percent}%`;
 
-    $("healthPercent").textContent =
-        `${percent}%`;
+    if ($("dataHealth")) {
 
-    $("healthProgress").style.width =
-        `${percent}%`;
+        $("dataHealth").textContent =
+            `${percent}%`;
+
+    }
+
+
+    if ($("healthPercent")) {
+
+        $("healthPercent").textContent =
+            `${percent}%`;
+
+    }
+
+
+    if ($("healthProgress")) {
+
+        $("healthProgress").style.width =
+            `${percent}%`;
+
+    }
 
 }
+
+
+/* =========================================================
+   LOW STOCK
+========================================================= */
 
 function renderLowStock() {
 
     const container =
         $("lowStockPreview");
 
+
     if (!container) {
 
         return;
 
     }
+
 
     const items =
         inventoryData
@@ -1924,21 +2274,19 @@ function renderLowStock() {
                 5
             );
 
+
     if (!items.length) {
 
         container.innerHTML = `
-
             <div class="empty-mini">
-
                 Tidak ada stok rendah.
-
             </div>
-
         `;
 
         return;
 
     }
+
 
     container.innerHTML =
         items.map(
@@ -1946,40 +2294,26 @@ function renderLowStock() {
 
                 return `
 
-                    <div
-                        class="mini-item"
-                    >
+                    <div class="mini-item">
 
-                        <div
-                            class="
-                                mini-item-main
-                            "
-                        >
+                        <div class="mini-item-main">
 
                             <strong>
-
                                 ${escapeHtml(
                                     item.nama
                                 )}
-
                             </strong>
 
                             <span>
-
                                 ${escapeHtml(
                                     item.ruangan
                                 )}
-
                             </span>
 
                         </div>
 
-                        <span
-                            class="mini-stock"
-                        >
-
+                        <span class="mini-stock">
                             ${item.jumlah}
-
                         </span>
 
                     </div>
@@ -1991,16 +2325,23 @@ function renderLowStock() {
 
 }
 
+
+/* =========================================================
+   RECENT
+========================================================= */
+
 function renderRecent() {
 
     const container =
         $("recentItems");
+
 
     if (!container) {
 
         return;
 
     }
+
 
     const items =
         [...inventoryData]
@@ -2018,21 +2359,19 @@ function renderRecent() {
                 6
             );
 
+
     if (!items.length) {
 
         container.innerHTML = `
-
             <div class="empty-mini">
-
                 Belum ada inventaris.
-
             </div>
-
         `;
 
         return;
 
     }
+
 
     container.innerHTML =
         items.map(
@@ -2040,45 +2379,31 @@ function renderRecent() {
 
                 return `
 
-                    <div
-                        class="recent-item"
-                    >
+                    <div class="recent-item">
 
-                        <div
-                            class="
-                                recent-item-main
-                            "
-                        >
+                        <div class="recent-item-main">
 
                             <strong>
-
                                 ${escapeHtml(
                                     item.nama
                                 )}
-
                             </strong>
 
                             <span>
-
                                 ${escapeHtml(
                                     item.ruangan
                                 )}
                                 ·
                                 ${item.jumlah}
                                 unit
-
                             </span>
 
                         </div>
 
-                        <span
-                            class="recent-date"
-                        >
-
+                        <span class="recent-date">
                             ${formatDate(
                                 item.tanggal
                             )}
-
                         </span>
 
                     </div>
@@ -2090,6 +2415,7 @@ function renderRecent() {
 
 }
 
+
 /* =========================================================
    ROOM FILTER
 ========================================================= */
@@ -2099,14 +2425,17 @@ function updateRoomFilter() {
     const select =
         $("roomFilter");
 
+
     if (!select) {
 
         return;
 
     }
 
+
     const current =
         select.value;
+
 
     const rooms =
         [
@@ -2125,15 +2454,13 @@ function updateRoomFilter() {
                 )
         );
 
+
     select.innerHTML = `
-
         <option value="all">
-
             Semua Ruangan
-
         </option>
-
     `;
+
 
     rooms.forEach(
         function (room) {
@@ -2143,11 +2470,14 @@ function updateRoomFilter() {
                     "option"
                 );
 
+
             option.value =
                 room;
 
+
             option.textContent =
                 room;
+
 
             select.appendChild(
                 option
@@ -2155,6 +2485,7 @@ function updateRoomFilter() {
 
         }
     );
+
 
     if (
         rooms.includes(
@@ -2169,6 +2500,7 @@ function updateRoomFilter() {
 
 }
 
+
 /* =========================================================
    MONITORING
 ========================================================= */
@@ -2178,12 +2510,14 @@ function updateMonitoring() {
     const total =
         inventoryData.length;
 
+
     const good =
         inventoryData.filter(
             item =>
                 item.kondisi ===
                 "Baik"
         ).length;
+
 
     const light =
         inventoryData.filter(
@@ -2192,12 +2526,14 @@ function updateMonitoring() {
                 "Ringan"
         ).length;
 
+
     const heavy =
         inventoryData.filter(
             item =>
                 item.kondisi ===
                 "Berat"
         ).length;
+
 
     const low =
         inventoryData.filter(
@@ -2207,60 +2543,62 @@ function updateMonitoring() {
                 ) <= 2
         ).length;
 
+
     if ($("monitorTotal")) {
 
-        $("monitorTotal")
-            .textContent =
+        $("monitorTotal").textContent =
             total;
 
     }
 
+
     if ($("monitorGood")) {
 
-        $("monitorGood")
-            .textContent =
+        $("monitorGood").textContent =
             good;
 
     }
 
+
     if ($("monitorLowStock")) {
 
-        $("monitorLowStock")
-            .textContent =
+        $("monitorLowStock").textContent =
             low;
 
     }
 
+
     if ($("healthGoodCount")) {
 
-        $("healthGoodCount")
-            .textContent =
+        $("healthGoodCount").textContent =
             good;
 
     }
 
+
     if ($("healthLightCount")) {
 
-        $("healthLightCount")
-            .textContent =
+        $("healthLightCount").textContent =
             light;
 
     }
 
+
     if ($("healthHeavyCount")) {
 
-        $("healthHeavyCount")
-            .textContent =
+        $("healthHeavyCount").textContent =
             heavy;
 
     }
+
 
     renderRooms();
 
 }
 
+
 /* =========================================================
-   ROOM OVERVIEW
+   DISTRIBUSI RUANGAN
 ========================================================= */
 
 function renderRooms() {
@@ -2268,20 +2606,27 @@ function renderRooms() {
     const container =
         $("roomOverview");
 
+
     if (!container) {
 
         return;
 
     }
 
+
     const roomData = {};
+
 
     inventoryData.forEach(
         function (item) {
 
-            roomData[item.ruangan] =
+            roomData[
+                item.ruangan
+            ] =
                 (
-                    roomData[item.ruangan] ||
+                    roomData[
+                        item.ruangan
+                    ] ||
                     0
                 ) +
                 Number(
@@ -2291,6 +2636,7 @@ function renderRooms() {
 
         }
     );
+
 
     const rooms =
         Object.entries(
@@ -2302,21 +2648,19 @@ function renderRooms() {
                 a[1]
         );
 
+
     if (!rooms.length) {
 
         container.innerHTML = `
-
             <div class="empty-mini">
-
                 Belum ada data ruangan.
-
             </div>
-
         `;
 
         return;
 
     }
+
 
     const max =
         Math.max(
@@ -2327,6 +2671,7 @@ function renderRooms() {
             1
         );
 
+
     container.innerHTML =
         rooms
             .slice(
@@ -2334,10 +2679,9 @@ function renderRooms() {
                 8
             )
             .map(
-                function ([
-                    room,
-                    count
-                ]) {
+                function (
+                    [room, count]
+                ) {
 
                     const width =
                         Math.round(
@@ -2346,38 +2690,27 @@ function renderRooms() {
                             100
                         );
 
+
                     return `
 
-                        <div
-                            class="room-row"
-                        >
+                        <div class="room-row">
 
-                            <div
-                                class="room-name"
-                            >
-
+                            <div class="room-name">
                                 ${escapeHtml(
                                     room
                                 )}
-
                             </div>
 
-                            <div
-                                class="room-bar"
-                            >
+                            <div class="room-bar">
 
                                 <div
-                                    style="
-                                        width:${width}%
-                                    "
+                                    style="width:${width}%"
                                 ></div>
 
                             </div>
 
                             <strong>
-
                                 ${count}
-
                             </strong>
 
                         </div>
@@ -2390,6 +2723,7 @@ function renderRooms() {
 
 }
 
+
 /* =========================================================
    STATISTICS
 ========================================================= */
@@ -2399,12 +2733,14 @@ function renderStatistics() {
     const total =
         inventoryData.length;
 
+
     const good =
         inventoryData.filter(
             item =>
                 item.kondisi ===
                 "Baik"
         ).length;
+
 
     const light =
         inventoryData.filter(
@@ -2413,6 +2749,7 @@ function renderStatistics() {
                 "Ringan"
         ).length;
 
+
     const heavy =
         inventoryData.filter(
             item =>
@@ -2420,13 +2757,14 @@ function renderStatistics() {
                 "Berat"
         ).length;
 
+
     if ($("donutTotal")) {
 
-        $("donutTotal")
-            .textContent =
+        $("donutTotal").textContent =
             total;
 
     }
+
 
     const goodPercent =
         total
@@ -2437,6 +2775,7 @@ function renderStatistics() {
             )
             : 0;
 
+
     const lightPercent =
         total
             ? Math.round(
@@ -2445,6 +2784,7 @@ function renderStatistics() {
                 100
             )
             : 0;
+
 
     const heavyPercent =
         total
@@ -2455,61 +2795,58 @@ function renderStatistics() {
             )
             : 0;
 
+
     if ($("legendGood")) {
 
-        $("legendGood")
-            .textContent =
+        $("legendGood").textContent =
             `${goodPercent}%`;
 
     }
 
+
     if ($("legendLight")) {
 
-        $("legendLight")
-            .textContent =
+        $("legendLight").textContent =
             `${lightPercent}%`;
 
     }
 
+
     if ($("legendHeavy")) {
 
-        $("legendHeavy")
-            .textContent =
+        $("legendHeavy").textContent =
             `${heavyPercent}%`;
 
     }
 
+
     const startLight =
         goodPercent;
+
 
     const startHeavy =
         goodPercent +
         lightPercent;
 
+
     if ($("conditionDonut")) {
 
         $("conditionDonut").style.background =
             `
-
                 conic-gradient(
-
                     var(--green)
-                    0%
-                    ${startLight}%,
+                    0% ${startLight}%,
 
                     var(--orange)
-                    ${startLight}%
-                    ${startHeavy}%,
+                    ${startLight}% ${startHeavy}%,
 
                     var(--red)
-                    ${startHeavy}%
-                    100%
-
+                    ${startHeavy}% 100%
                 )
-
             `;
 
     }
+
 
     const safe =
         inventoryData.filter(
@@ -2519,6 +2856,7 @@ function renderStatistics() {
                 ) > 2
         ).length;
 
+
     const low =
         inventoryData.filter(
             item =>
@@ -2527,21 +2865,22 @@ function renderStatistics() {
                 ) <= 2
         ).length;
 
+
     if ($("safeStockCount")) {
 
-        $("safeStockCount")
-            .textContent =
+        $("safeStockCount").textContent =
             safe;
 
     }
 
+
     if ($("lowStockStat")) {
 
-        $("lowStockStat")
-            .textContent =
+        $("lowStockStat").textContent =
             low;
 
     }
+
 
     const safePercent =
         total
@@ -2552,6 +2891,7 @@ function renderStatistics() {
             )
             : 0;
 
+
     const lowPercent =
         total
             ? Math.round(
@@ -2561,30 +2901,37 @@ function renderStatistics() {
             )
             : 0;
 
+
     if ($("safeStockProgress")) {
 
-        $("safeStockProgress")
-            .style.width =
+        $("safeStockProgress").style.width =
             `${safePercent}%`;
 
     }
 
+
     if ($("lowStockProgress")) {
 
-        $("lowStockProgress")
-            .style.width =
+        $("lowStockProgress").style.width =
             `${lowPercent}%`;
 
     }
+
 
     renderCategories();
 
 }
 
+
+/* =========================================================
+   CATEGORIES
+========================================================= */
+
 function renderCategories() {
 
     const container =
         $("categoryStats");
+
 
     if (!container) {
 
@@ -2592,12 +2939,16 @@ function renderCategories() {
 
     }
 
+
     const categories = {};
+
 
     inventoryData.forEach(
         function (item) {
 
-            categories[item.kategori] =
+            categories[
+                item.kategori
+            ] =
                 (
                     categories[
                         item.kategori
@@ -2611,6 +2962,7 @@ function renderCategories() {
 
         }
     );
+
 
     const list =
         Object.entries(
@@ -2626,21 +2978,19 @@ function renderCategories() {
             8
         );
 
+
     if (!list.length) {
 
         container.innerHTML = `
-
             <div class="empty-mini">
-
                 Belum ada kategori.
-
             </div>
-
         `;
 
         return;
 
     }
+
 
     const max =
         Math.max(
@@ -2651,13 +3001,13 @@ function renderCategories() {
             1
         );
 
+
     container.innerHTML =
         list
             .map(
-                function ([
-                    name,
-                    count
-                ]) {
+                function (
+                    [name, count]
+                ) {
 
                     const width =
                         Math.round(
@@ -2666,38 +3016,27 @@ function renderCategories() {
                             100
                         );
 
+
                     return `
 
-                        <div
-                            class="category-item"
-                        >
+                        <div class="category-item">
 
-                            <div
-                                class="category-name"
-                            >
-
+                            <div class="category-name">
                                 ${escapeHtml(
                                     name
                                 )}
-
                             </div>
 
-                            <div
-                                class="category-bar"
-                            >
+                            <div class="category-bar">
 
                                 <div
-                                    style="
-                                        width:${width}%
-                                    "
+                                    style="width:${width}%"
                                 ></div>
 
                             </div>
 
                             <strong>
-
                                 ${count}
-
                             </strong>
 
                         </div>
@@ -2709,6 +3048,7 @@ function renderCategories() {
             .join("");
 
 }
+
 
 /* =========================================================
    ACTIVITY
@@ -2723,32 +3063,62 @@ function loadActivity() {
                 ACTIVITY_KEY
             );
 
+
         activityData =
             saved
                 ? JSON.parse(saved)
                 : [];
 
-    } catch {
 
-        activityData = [];
+        if (!Array.isArray(
+            activityData
+        )) {
+
+            activityData =
+                [];
+
+        }
+
+    } catch (error) {
+
+        console.warn(
+            "Load activity error:",
+            error
+        );
+
+        activityData =
+            [];
 
     }
 
 }
 
+
 function saveActivity() {
 
-    localStorage.setItem(
-        ACTIVITY_KEY,
-        JSON.stringify(
-            activityData.slice(
-                0,
-                50
+    try {
+
+        localStorage.setItem(
+            ACTIVITY_KEY,
+            JSON.stringify(
+                activityData.slice(
+                    0,
+                    50
+                )
             )
-        )
-    );
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Save activity error:",
+            error
+        );
+
+    }
 
 }
+
 
 function addActivity(
     text,
@@ -2772,11 +3142,13 @@ function addActivity(
 
     });
 
+
     activityData =
         activityData.slice(
             0,
             50
         );
+
 
     saveActivity();
 
@@ -2784,10 +3156,12 @@ function addActivity(
 
 }
 
+
 function renderActivity() {
 
     const container =
         $("activityLog");
+
 
     if (!container) {
 
@@ -2795,23 +3169,19 @@ function renderActivity() {
 
     }
 
-    if (
-        !activityData.length
-    ) {
+
+    if (!activityData.length) {
 
         container.innerHTML = `
-
             <div class="empty-mini">
-
                 Belum ada aktivitas.
-
             </div>
-
         `;
 
         return;
 
     }
+
 
     container.innerHTML =
         activityData
@@ -2824,53 +3194,36 @@ function renderActivity() {
 
                     return `
 
-                        <div
-                            class="activity-item"
-                        >
+                        <div class="activity-item">
 
-                            <div
-                                class="activity-icon"
-                            >
+                            <div class="activity-icon">
 
                                 <i
-                                    class="
-                                        fa-solid
-                                        ${escapeHtml(
-                                            item.icon
-                                        )}
-                                    "
+                                    class="fa-solid ${escapeHtml(
+                                        item.icon
+                                    )}"
                                 ></i>
 
                             </div>
 
-                            <div
-                                class="activity-text"
-                            >
+                            <div class="activity-text">
 
                                 <strong>
-
                                     ${escapeHtml(
                                         item.text
                                     )}
-
                                 </strong>
 
                                 <span>
-
                                     Sistem Inventaris
-
                                 </span>
 
                             </div>
 
-                            <div
-                                class="activity-time"
-                            >
-
+                            <div class="activity-time">
                                 ${formatTime(
                                     item.time
                                 )}
-
                             </div>
 
                         </div>
@@ -2883,8 +3236,9 @@ function renderActivity() {
 
 }
 
+
 /* =========================================================
-   STORAGE
+   STORAGE MONITORING
 ========================================================= */
 
 function updateStorage() {
@@ -2896,10 +3250,12 @@ function updateStorage() {
                 STORAGE_KEY
             ) || "";
 
+
         const bytes =
             new Blob(
                 [data]
             ).size;
+
 
         const percent =
             Math.min(
@@ -2915,36 +3271,41 @@ function updateStorage() {
                 )
             );
 
+
         if ($("monitorStorage")) {
 
-            $("monitorStorage")
-                .textContent =
+            $("monitorStorage").textContent =
                 `${percent}%`;
 
         }
+
 
         if ($("terminalStorage")) {
 
-            $("terminalStorage")
-                .textContent =
+            $("terminalStorage").textContent =
                 `${percent}%`;
 
         }
 
-    } catch {
+    } catch (error) {
+
+        console.warn(
+            "Storage monitor error:",
+            error
+        );
+
 
         if ($("monitorStorage")) {
 
-            $("monitorStorage")
-                .textContent =
+            $("monitorStorage").textContent =
                 "0%";
 
         }
 
+
         if ($("terminalStorage")) {
 
-            $("terminalStorage")
-                .textContent =
+            $("terminalStorage").textContent =
                 "0%";
 
         }
@@ -2952,6 +3313,11 @@ function updateStorage() {
     }
 
 }
+
+
+/* =========================================================
+   AUTO BACKUP
+========================================================= */
 
 function createAutoBackup() {
 
@@ -2962,7 +3328,7 @@ function createAutoBackup() {
             JSON.stringify({
 
                 version:
-                    "5.3",
+                    "5.4",
 
                 createdAt:
                     new Date().toISOString(),
@@ -2978,17 +3344,23 @@ function createAutoBackup() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "Auto backup error:",
+            error
+        );
 
     }
 
 }
 
+
+/* =========================================================
+   BACKUP
+========================================================= */
+
 function createBackup() {
 
-    if (
-        !inventoryData.length
-    ) {
+    if (!inventoryData.length) {
 
         showToast(
             "Belum ada data untuk backup.",
@@ -2999,10 +3371,11 @@ function createBackup() {
 
     }
 
+
     const backup = {
 
         version:
-            "5.3",
+            "5.4",
 
         createdAt:
             new Date().toISOString(),
@@ -3015,26 +3388,26 @@ function createBackup() {
 
     };
 
+
     createAutoBackup();
 
-    downloadFile(
 
+    downloadFile(
         JSON.stringify(
             backup,
             null,
             2
         ),
-
         `inventory-backup-${fileDate()}.json`,
-
         "application/json"
-
     );
+
 
     addActivity(
         "Membuat backup data",
         "fa-database"
     );
+
 
     showToast(
         "Backup berhasil dibuat.",
@@ -3043,16 +3416,23 @@ function createBackup() {
 
 }
 
+
+/* =========================================================
+   RESTORE
+========================================================= */
+
 function handleRestore(event) {
 
     const file =
         event.target.files?.[0];
+
 
     if (!file) {
 
         return;
 
     }
+
 
     readJSON(file)
         .then(
@@ -3071,20 +3451,20 @@ function handleRestore(event) {
 
                 }
 
+
                 openConfirmModal(
-
                     "Restore Backup",
-
                     "Data saat ini akan diganti dengan isi backup.",
-
                     function () {
 
                         createAutoBackup();
+
 
                         inventoryData =
                             normalizeData(
                                 data.inventory
                             );
+
 
                         if (
                             Array.isArray(
@@ -3099,14 +3479,17 @@ function handleRestore(event) {
 
                         }
 
+
                         saveData();
 
                         renderAll();
+
 
                         addActivity(
                             "Memulihkan backup",
                             "fa-clock-rotate-left"
                         );
+
 
                         showToast(
                             "Backup berhasil dipulihkan.",
@@ -3114,13 +3497,18 @@ function handleRestore(event) {
                         );
 
                     }
-
                 );
 
             }
         )
         .catch(
-            function () {
+            function (error) {
+
+                console.error(
+                    "Restore error:",
+                    error
+                );
+
 
                 showToast(
                     "File backup tidak valid.",
@@ -3140,15 +3528,14 @@ function handleRestore(event) {
 
 }
 
+
 /* =========================================================
    EXPORT CSV
 ========================================================= */
 
 function exportCSV() {
 
-    if (
-        !inventoryData.length
-    ) {
+    if (!inventoryData.length) {
 
         showToast(
             "Belum ada data.",
@@ -3158,6 +3545,7 @@ function exportCSV() {
         return;
 
     }
+
 
     const headers = [
 
@@ -3171,6 +3559,7 @@ function exportCSV() {
         "Tanggal"
 
     ];
+
 
     const rows =
         inventoryData.map(
@@ -3188,7 +3577,9 @@ function exportCSV() {
 
                     item.jumlah,
 
-                    item.kondisi,
+                    conditionLabel(
+                        item.kondisi
+                    ),
 
                     item.keterangan,
 
@@ -3201,6 +3592,7 @@ function exportCSV() {
             }
         );
 
+
     const csv = [
 
         headers,
@@ -3209,28 +3601,31 @@ function exportCSV() {
 
     ]
     .map(
-        row =>
-            row
-                .map(csvEscape)
-                .join(",")
+        function (row) {
+
+            return row
+                .map(
+                    csvEscape
+                )
+                .join(",");
+
+        }
     )
     .join("\n");
 
+
     downloadFile(
-
-        "\uFEFF" +
-        csv,
-
+        "\uFEFF" + csv,
         `inventaris-${fileDate()}.csv`,
-
         "text/csv;charset=utf-8;"
-
     );
+
 
     addActivity(
         "Export data CSV",
         "fa-file-export"
     );
+
 
     showToast(
         "Data berhasil diexport.",
@@ -3238,6 +3633,7 @@ function exportCSV() {
     );
 
 }
+
 
 /* =========================================================
    FILTER RESET
@@ -3247,42 +3643,43 @@ function resetFilters() {
 
     if ($("searchInput")) {
 
-        $("searchInput")
-            .value =
+        $("searchInput").value =
             "";
 
     }
 
+
     if ($("roomFilter")) {
 
-        $("roomFilter")
-            .value =
+        $("roomFilter").value =
             "all";
 
     }
+
 
     if ($("conditionFilter")) {
 
-        $("conditionFilter")
-            .value =
+        $("conditionFilter").value =
             "all";
 
     }
 
+
     if ($("sortFilter")) {
 
-        $("sortFilter")
-            .value =
+        $("sortFilter").value =
             "newest";
 
     }
+
 
     renderInventory();
 
 }
 
+
 /* =========================================================
-   CONFIRM
+   CONFIRM MODAL
 ========================================================= */
 
 function openConfirmModal(
@@ -3293,29 +3690,36 @@ function openConfirmModal(
 
     if ($("confirmTitle")) {
 
-        $("confirmTitle")
-            .textContent =
+        $("confirmTitle").textContent =
             title;
 
     }
 
+
     if ($("confirmMessage")) {
 
-        $("confirmMessage")
-            .textContent =
+        $("confirmMessage").textContent =
             message;
 
     }
 
+
     confirmCallback =
         callback;
+
 
     $("confirmModal")
         ?.classList.add(
             "show"
         );
 
+
+    document.body.classList.add(
+        "modal-open"
+    );
+
 }
+
 
 function closeConfirmModal() {
 
@@ -3324,10 +3728,17 @@ function closeConfirmModal() {
             "show"
         );
 
+
+    document.body.classList.remove(
+        "modal-open"
+    );
+
+
     confirmCallback =
         null;
 
 }
+
 
 /* =========================================================
    THEME
@@ -3340,20 +3751,23 @@ function loadTheme() {
             THEME_KEY
         );
 
+
     const dark =
-        saved ===
-        "dark";
+        saved === "dark";
+
 
     document.body.classList.toggle(
         "dark",
         dark
     );
 
+
     updateThemeUI(
         dark
     );
 
 }
+
 
 function toggleTheme() {
 
@@ -3362,15 +3776,14 @@ function toggleTheme() {
             "dark"
         );
 
+
     localStorage.setItem(
-
         THEME_KEY,
-
         dark
             ? "dark"
             : "light"
-
     );
+
 
     updateThemeUI(
         dark
@@ -3378,88 +3791,65 @@ function toggleTheme() {
 
 }
 
-function updateThemeUI(
-    dark
-) {
+
+function updateThemeUI(dark) {
 
     if ($("themeButton")) {
 
         $("themeButton").innerHTML =
             dark
-
                 ? `
                     <span>
-                        <i
-                            class="
-                                fa-solid
-                                fa-sun
-                            "
-                        ></i>
-
+                        <i class="fa-solid fa-sun"></i>
                         Light Mode
-
                     </span>
 
                     <i
-                        class="
-                            fa-solid
-                            fa-toggle-on
-                        "
+                        class="fa-solid fa-toggle-on"
                     ></i>
                   `
-
                 : `
                     <span>
-
-                        <i
-                            class="
-                                fa-solid
-                                fa-moon
-                            "
-                        ></i>
-
+                        <i class="fa-solid fa-moon"></i>
                         Dark Mode
-
                     </span>
 
                     <i
-                        class="
-                            fa-solid
-                            fa-toggle-off
-                        "
+                        class="fa-solid fa-toggle-off"
                     ></i>
                   `;
 
     }
+
 
     if ($("mobileThemeButton")) {
 
-        $("mobileThemeButton")
-            .innerHTML =
-
+        $("mobileThemeButton").innerHTML =
             dark
-
                 ? `
                     <i
-                        class="
-                            fa-solid
-                            fa-sun
-                        "
+                        class="fa-solid fa-sun"
                     ></i>
                   `
-
                 : `
                     <i
-                        class="
-                            fa-solid
-                            fa-moon
-                        "
+                        class="fa-solid fa-moon"
                     ></i>
                   `;
 
     }
 
+
+    document.documentElement
+        .setAttribute(
+            "data-theme",
+            dark
+                ? "dark"
+                : "light"
+        );
+
 }
+
 
 /* =========================================================
    CLOCK
@@ -3470,17 +3860,19 @@ function updateClock() {
     const now =
         new Date();
 
+
     if ($("liveClock")) {
 
-        $("liveClock")
-            .textContent =
+        $("liveClock").textContent =
             now.toLocaleTimeString(
                 "id-ID",
                 {
                     hour:
                         "2-digit",
+
                     minute:
                         "2-digit",
+
                     second:
                         "2-digit"
                 }
@@ -3488,19 +3880,22 @@ function updateClock() {
 
     }
 
+
     if ($("liveDate")) {
 
-        $("liveDate")
-            .textContent =
+        $("liveDate").textContent =
             now.toLocaleDateString(
                 "id-ID",
                 {
                     weekday:
                         "long",
+
                     day:
                         "numeric",
+
                     month:
                         "long",
+
                     year:
                         "numeric"
                 }
@@ -3510,6 +3905,7 @@ function updateClock() {
 
 }
 
+
 /* =========================================================
    FOOTER YEAR
 ========================================================= */
@@ -3518,8 +3914,7 @@ function updateFooterYear() {
 
     if ($("footerYear")) {
 
-        $("footerYear")
-            .textContent =
+        $("footerYear").textContent =
             new Date()
                 .getFullYear();
 
@@ -3527,22 +3922,21 @@ function updateFooterYear() {
 
 }
 
+
 /* =========================================================
-   PWA
+   PWA - SERVICE WORKER
 ========================================================= */
 
 async function registerServiceWorker() {
 
     if (
-        !(
-            "serviceWorker"
-            in navigator
-        )
+        !("serviceWorker" in navigator)
     ) {
 
         return;
 
     }
+
 
     if (
         location.protocol ===
@@ -3553,10 +3947,16 @@ async function registerServiceWorker() {
 
     }
 
+
     try {
 
         await navigator.serviceWorker.register(
             "service-worker.js"
+        );
+
+
+        console.info(
+            "Service Worker registered."
         );
 
     } catch (error) {
@@ -3569,6 +3969,11 @@ async function registerServiceWorker() {
     }
 
 }
+
+
+/* =========================================================
+   PWA - INSTALL
+========================================================= */
 
 async function installPWA() {
 
@@ -3583,18 +3988,27 @@ async function installPWA() {
 
     }
 
-    deferredInstallPrompt.prompt();
 
     try {
 
+        deferredInstallPrompt.prompt();
+
+
         await deferredInstallPrompt.userChoice;
 
-    } catch {
+    } catch (error) {
+
+        console.warn(
+            "Install prompt error:",
+            error
+        );
 
     }
 
+
     deferredInstallPrompt =
         null;
+
 
     $("installButton")
         ?.classList.add(
@@ -3603,15 +4017,14 @@ async function installPWA() {
 
 }
 
+
 /* =========================================================
    CLEAR ACTIVITY
 ========================================================= */
 
 function clearActivities() {
 
-    if (
-        !activityData.length
-    ) {
+    if (!activityData.length) {
 
         showToast(
             "Aktivitas sudah kosong.",
@@ -3622,19 +4035,20 @@ function clearActivities() {
 
     }
 
+
     openConfirmModal(
-
         "Bersihkan Aktivitas",
-
         "Semua aktivitas akan dihapus.",
-
         function () {
 
-            activityData = [];
+            activityData =
+                [];
+
 
             saveActivity();
 
             renderActivity();
+
 
             showToast(
                 "Aktivitas berhasil dibersihkan.",
@@ -3642,13 +4056,13 @@ function clearActivities() {
             );
 
         }
-
     );
 
 }
 
+
 /* =========================================================
-   HELPERS
+   CREATE ID
 ========================================================= */
 
 function createId() {
@@ -3662,18 +4076,21 @@ function createId() {
 
     }
 
-    return (
 
+    return (
         Date.now()
             .toString(36) +
-
         Math.random()
             .toString(36)
             .slice(2)
-
     );
 
 }
+
+
+/* =========================================================
+   CONDITION LABEL
+========================================================= */
 
 function conditionLabel(
     condition
@@ -3688,6 +4105,7 @@ function conditionLabel(
 
     }
 
+
     if (
         condition ===
         "Berat"
@@ -3697,16 +4115,21 @@ function conditionLabel(
 
     }
 
+
     return "Baik";
 
 }
 
-function formatDate(
-    value
-) {
+
+/* =========================================================
+   FORMAT DATE
+========================================================= */
+
+function formatDate(value) {
 
     const date =
         new Date(value);
+
 
     if (
         Number.isNaN(
@@ -3718,13 +4141,16 @@ function formatDate(
 
     }
 
+
     return date.toLocaleDateString(
         "id-ID",
         {
             day:
                 "2-digit",
+
             month:
                 "short",
+
             year:
                 "numeric"
         }
@@ -3732,12 +4158,16 @@ function formatDate(
 
 }
 
-function formatTime(
-    value
-) {
+
+/* =========================================================
+   FORMAT TIME
+========================================================= */
+
+function formatTime(value) {
 
     const date =
         new Date(value);
+
 
     if (
         Number.isNaN(
@@ -3749,11 +4179,13 @@ function formatTime(
 
     }
 
+
     return date.toLocaleTimeString(
         "id-ID",
         {
             hour:
                 "2-digit",
+
             minute:
                 "2-digit"
         }
@@ -3761,18 +4193,23 @@ function formatTime(
 
 }
 
+
+/* =========================================================
+   FILE DATE
+========================================================= */
+
 function fileDate() {
 
     const date =
         new Date();
+
 
     return [
 
         date.getFullYear(),
 
         String(
-            date.getMonth() +
-            1
+            date.getMonth() + 1
         ).padStart(
             2,
             "0"
@@ -3789,9 +4226,12 @@ function fileDate() {
 
 }
 
-function csvEscape(
-    value
-) {
+
+/* =========================================================
+   CSV ESCAPE
+========================================================= */
+
+function csvEscape(value) {
 
     const text =
         String(
@@ -3799,22 +4239,33 @@ function csvEscape(
             ""
         );
 
+
     if (
         text.includes(",") ||
         text.includes('"') ||
         text.includes("\n")
     ) {
 
-        return `"${text.replace(
-            /"/g,
-            '""'
-        )}"`;
+        return (
+            '"' +
+            text.replace(
+                /"/g,
+                '""'
+            ) +
+            '"'
+        );
 
     }
+
 
     return text;
 
 }
+
+
+/* =========================================================
+   DOWNLOAD FILE
+========================================================= */
 
 function downloadFile(
     content,
@@ -3824,36 +4275,50 @@ function downloadFile(
 
     const blob =
         new Blob(
-            [content],
+            [
+                content
+            ],
             {
                 type:
                     type
             }
         );
 
+
     const url =
         URL.createObjectURL(
             blob
         );
+
 
     const link =
         document.createElement(
             "a"
         );
 
+
     link.href =
         url;
 
+
     link.download =
         filename;
+
+
+    link.style.display =
+        "none";
+
 
     document.body.appendChild(
         link
     );
 
+
     link.click();
 
+
     link.remove();
+
 
     setTimeout(
         function () {
@@ -3863,14 +4328,17 @@ function downloadFile(
             );
 
         },
-        100
+        150
     );
 
 }
 
-function readJSON(
-    file
-) {
+
+/* =========================================================
+   READ JSON
+========================================================= */
+
+function readJSON(file) {
 
     return new Promise(
         function (
@@ -3880,6 +4348,7 @@ function readJSON(
 
             const reader =
                 new FileReader();
+
 
             reader.onload =
                 function () {
@@ -3894,14 +4363,24 @@ function readJSON(
 
                     } catch (error) {
 
-                        reject(error);
+                        reject(
+                            error
+                        );
 
                     }
 
                 };
 
+
             reader.onerror =
-                reject;
+                function () {
+
+                    reject(
+                        reader.error
+                    );
+
+                };
+
 
             reader.readAsText(
                 file
@@ -3912,41 +4391,40 @@ function readJSON(
 
 }
 
-function escapeHtml(
-    value
-) {
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeHtml(value) {
 
     return String(
         value ??
         ""
     )
-
     .replace(
         /&/g,
         "&amp;"
     )
-
     .replace(
         /</g,
         "&lt;"
     )
-
     .replace(
         />/g,
         "&gt;"
     )
-
     .replace(
         /"/g,
         "&quot;"
     )
-
     .replace(
         /'/g,
         "&#039;"
     );
 
 }
+
 
 /* =========================================================
    TOAST
@@ -3960,17 +4438,21 @@ function showToast(
     const container =
         $("toastContainer");
 
+
     if (!container) {
 
         return;
 
     }
 
+
     let icon =
         "fa-circle-info";
 
+
     let title =
         "Informasi";
+
 
     if (
         type ===
@@ -3985,6 +4467,7 @@ function showToast(
 
     }
 
+
     if (
         type ===
         "error"
@@ -3998,51 +4481,72 @@ function showToast(
 
     }
 
+
     const toast =
         document.createElement(
             "div"
         );
 
+
     toast.className =
         `toast ${type}`;
+
 
     toast.innerHTML = `
 
         <i
-            class="
-                fa-solid
-                ${icon}
-            "
+            class="fa-solid ${icon}"
         ></i>
 
         <div>
 
             <strong>
-
                 ${title}
-
             </strong>
 
             <span>
-
                 ${escapeHtml(
                     message
                 )}
-
             </span>
 
         </div>
 
     `;
 
+
     container.appendChild(
         toast
     );
 
+
+    requestAnimationFrame(
+        function () {
+
+            toast.classList.add(
+                "show"
+            );
+
+        }
+    );
+
+
     setTimeout(
         function () {
 
-            toast.remove();
+            toast.classList.remove(
+                "show"
+            );
+
+
+            setTimeout(
+                function () {
+
+                    toast.remove();
+
+                },
+                250
+            );
 
         },
         3000
