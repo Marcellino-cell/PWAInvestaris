@@ -479,6 +479,26 @@
     <div class="sidebar-bottom">
 
 
+
+
+        <button
+            id="loginButton"
+            class="login-sidebar-button"
+            type="button"
+        >
+
+            <span>
+                <i class="fa-solid fa-right-to-bracket"></i>
+                <span id="loginButtonText">Login Admin</span>
+            </span>
+
+            <span
+                id="loginStatusDot"
+                class="login-status-dot"
+            ></span>
+
+        </button>
+
         <button
             id="installButton"
             class="install-button hidden"
@@ -2411,6 +2431,116 @@
 
 </main>
 
+
+
+
+
+<!-- =====================================================
+     LOGIN ADMIN
+===================================================== -->
+
+<div
+    id="loginModal"
+    class="modal-overlay"
+>
+
+    <div class="modal-box login-modal-box">
+
+        <div class="modal-header">
+
+            <div>
+
+                <div class="section-label">
+                    ADMIN ACCESS
+                </div>
+
+                <h2>
+                    Login Admin
+                </h2>
+
+            </div>
+
+            <button
+                id="closeLoginButton"
+                class="modal-close"
+                type="button"
+            >
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+        </div>
+
+        <div class="login-security-badge">
+            <i class="fa-solid fa-shield-halved"></i>
+            <div>
+                <strong>Mode Pengelolaan Data</strong>
+                <span>Login diperlukan untuk menambah atau mengedit inventaris.</span>
+            </div>
+        </div>
+
+        <form id="loginForm" autocomplete="off">
+
+            <div class="form-group">
+                <label for="loginUsername">Username</label>
+                <div class="login-input-wrap">
+                    <i class="fa-solid fa-user"></i>
+                    <input
+                        id="loginUsername"
+                        type="text"
+                        placeholder="Masukkan username"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="loginPassword">Password</label>
+                <div class="login-input-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input
+                        id="loginPassword"
+                        type="password"
+                        placeholder="Masukkan password"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div
+                id="loginError"
+                class="login-error"
+            ></div>
+
+            <div class="modal-actions">
+
+                <button
+                    id="cancelLoginButton"
+                    class="secondary-button"
+                    type="button"
+                >
+                    Batal
+                </button>
+
+                <button
+                    class="primary-button"
+                    type="submit"
+                >
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    Masuk
+                </button>
+
+            </div>
+
+        </form>
+
+        <div class="login-demo-note">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Default akun tugas: <strong>admin</strong> / <strong>admin123</strong></span>
+        </div>
+
+    </div>
+
+</div>
 
 
 <!-- =====================================================
