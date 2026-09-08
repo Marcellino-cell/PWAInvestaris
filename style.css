@@ -3899,184 +3899,325 @@ tbody td {
     }
 }
 
+
 /* =========================================================
-   ROOM DISTRIBUTION - MODERN DONUT
-   Hanya menimpa tampilan Distribusi Ruangan.
-   CSS lama dan fitur lain tetap dipertahankan.
+   LOGIN / ADMIN ACCESS - PREMIUM
 ========================================================= */
 
-.room-overview {
-    display: grid !important;
-    grid-template-columns: minmax(180px, 220px) 1fr !important;
-    align-items: center !important;
-    gap: 20px !important;
-    min-height: 210px;
-}
-
-.room-donut-wrap {
+.login-sidebar-button {
     position: relative;
-    width: 200px;
-    height: 200px;
-    margin: auto;
-}
-
-.room-donut-canvas {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    box-shadow: 0 10px 28px rgba(37,99,235,.12);
-}
-
-.room-donut-canvas::after {
-    content: "";
-    position: absolute;
-    inset: 39px;
-    border-radius: 50%;
-    background: var(--surface);
-    box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.room-donut-center {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    pointer-events: none;
-}
-
-.room-donut-center strong {
-    color: var(--text);
-    font-size: 27px;
-    line-height: 1;
-    font-weight: 800;
-}
-
-.room-donut-center span {
-    margin-top: 7px;
-    color: var(--text-soft);
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-}
-
-.room-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    max-height: 205px;
-    overflow-y: auto;
-    padding-right: 3px;
-}
-
-.room-legend::-webkit-scrollbar {
-    width: 4px;
-}
-
-.room-legend::-webkit-scrollbar-thumb {
-    background: rgba(148,163,184,.25);
-    border-radius: 999px;
-}
-
-.room-legend-item {
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 8px 9px;
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    background: var(--surface-2);
-    transition: .2s ease;
+    padding: 11px 12px;
+    margin-bottom: 9px;
+    border: 1px solid rgba(37,99,235,.20);
+    border-radius: 13px;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(37,99,235,.10),
+            rgba(124,58,237,.07)
+        );
+    color: var(--text);
+    font-size: 9px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    pointer-events: auto !important;
+    overflow: hidden;
+    transition:
+        transform .25s ease,
+        border-color .25s ease,
+        background .25s ease,
+        box-shadow .25s ease;
 }
 
-.room-legend-item:hover {
-    transform: translateX(3px);
-    border-color: rgba(37,99,235,.22);
+.login-sidebar-button::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -120%;
+    width: 80%;
+    height: 100%;
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            rgba(255,255,255,.14),
+            transparent
+        );
+    transform: skewX(-20deg);
+    transition: left .65s ease;
+    pointer-events: none;
 }
 
-.room-legend-left {
+.login-sidebar-button:hover {
+    transform: translateY(-2px);
+    color: var(--text);
+    border-color: rgba(37,99,235,.42);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(37,99,235,.16),
+            rgba(124,58,237,.12)
+        );
+    box-shadow:
+        0 10px 26px
+        rgba(37,99,235,.15);
+}
+
+.login-sidebar-button:hover::before {
+    left: 135%;
+}
+
+.login-sidebar-button > span:first-child {
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
 }
 
-.room-legend-dot {
+.login-sidebar-button > span:first-child > i {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 34px;
+    border-radius: 10px;
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #7c3aed
+        );
+    color: #fff;
+    font-size: 12px;
+    box-shadow:
+        0 7px 16px
+        rgba(37,99,235,.23);
+}
+
+.login-sidebar-button #loginButtonText {
+    display: block;
+    color: var(--text);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.login-status-dot {
     width: 8px;
     height: 8px;
     flex: 0 0 8px;
     border-radius: 50%;
-    box-shadow: 0 0 8px currentColor;
+    background: #64748b;
+    box-shadow: none;
+    transition:
+        background .25s ease,
+        box-shadow .25s ease,
+        transform .25s ease;
 }
 
-.room-legend-name {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--text);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: 9px;
-    font-weight: 700;
+.login-status-dot:not(.logged-in) {
+    background: var(--orange);
+    box-shadow: 0 0 9px rgba(234,88,12,.28);
 }
 
-.room-legend-value {
+.login-status-dot.logged-in {
+    background: var(--green);
+    box-shadow: 0 0 11px rgba(22,163,74,.55);
+    animation: loginPulse 1.8s ease-in-out infinite;
+}
+
+.admin-logged-in .login-sidebar-button {
+    border-color: rgba(22,163,74,.28);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(22,163,74,.10),
+            rgba(16,185,129,.06)
+        );
+}
+
+.admin-logged-in .login-sidebar-button:hover {
+    border-color: rgba(22,163,74,.45);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(22,163,74,.15),
+            rgba(16,185,129,.09)
+        );
+    box-shadow:
+        0 10px 26px
+        rgba(22,163,74,.13);
+}
+
+.admin-logged-in .login-sidebar-button > span:first-child > i {
+    background:
+        linear-gradient(
+            135deg,
+            #16a34a,
+            #059669
+        );
+    box-shadow:
+        0 7px 16px
+        rgba(22,163,74,.20);
+}
+
+@keyframes loginPulse {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.35);
+        opacity: .72;
+    }
+}
+
+/* =========================================================
+   LOGIN MODAL
+========================================================= */
+
+.login-modal-box {
+    width: min(100%, 470px);
+    border: 1px solid rgba(37,99,235,.18);
+    box-shadow:
+        0 30px 80px rgba(15,23,42,.28),
+        0 0 55px rgba(37,99,235,.08);
+}
+
+body.dark .login-modal-box {
+    border-color: rgba(96,165,250,.15);
+    box-shadow:
+        0 30px 80px rgba(0,0,0,.50),
+        0 0 55px rgba(37,99,235,.10);
+}
+
+.login-security-badge {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 13px;
+    margin-bottom: 18px;
+    border: 1px solid rgba(37,99,235,.15);
+    border-radius: 12px;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(37,99,235,.08),
+            rgba(124,58,237,.06)
+        );
+    color: var(--primary);
+}
+
+.login-security-badge > i {
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
-    gap: 5px;
+    justify-content: center;
     flex-shrink: 0;
+    margin-top: 0;
+    border-radius: 8px;
+    background: rgba(37,99,235,.10);
+    font-size: 12px;
 }
 
-.room-legend-count {
+.login-security-badge strong,
+.login-security-badge span {
+    display: block;
+}
+
+.login-security-badge strong {
+    margin-bottom: 4px;
     color: var(--text);
     font-size: 10px;
     font-weight: 800;
 }
 
-.room-legend-percent {
-    min-width: 37px;
-    padding: 3px 5px;
-    border-radius: 6px;
-    background: rgba(37,99,235,.08);
-    color: var(--primary);
-    text-align: center;
-    font-size: 8px;
-    font-weight: 800;
-}
-
-.room-donut-empty {
-    grid-column: 1 / -1;
-    padding: 35px 10px;
+.login-security-badge span {
     color: var(--text-soft);
-    text-align: center;
-    font-size: 9px;
+    font-size: 8px;
+    line-height: 1.55;
 }
 
-@media (max-width: 900px) {
-    .room-overview {
-        grid-template-columns: 1fr !important;
+.login-input-wrap {
+    position: relative;
+}
+
+.login-input-wrap > i {
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-soft);
+    font-size: 11px;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.login-input-wrap input {
+    padding-left: 37px !important;
+}
+
+.login-input-wrap input:focus + i {
+    color: var(--primary);
+}
+
+.login-error {
+    min-height: 19px;
+    margin-top: -2px;
+    color: var(--red);
+    font-size: 8px;
+    font-weight: 700;
+}
+
+.login-demo-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    color: var(--text-soft);
+    font-size: 8px;
+    line-height: 1.5;
+}
+
+.login-demo-note i {
+    color: var(--primary);
+}
+
+.login-demo-note strong {
+    color: var(--text);
+}
+
+@media (max-width: 600px) {
+
+    .login-sidebar-button {
+        padding: 10px 11px;
     }
 
-    .room-donut-wrap {
-        width: 185px;
-        height: 185px;
+    .login-sidebar-button > span:first-child > i {
+        width: 33px;
+        height: 33px;
+        flex-basis: 33px;
     }
 
-    .room-legend {
-        max-height: none;
+    .login-modal-box {
+        width: 100%;
     }
 }
 
-@media (max-width: 520px) {
-    .room-donut-wrap {
-        width: 170px;
-        height: 170px;
-    }
-
-    .room-donut-center strong {
-        font-size: 23px;
-    }
+/* Saat belum login, tombol edit/hapus tetap terlihat tetapi terkunci. */
+body:not(.admin-logged-in) .edit-button,
+body:not(.admin-logged-in) .delete-button {
+    opacity: .78;
 }
