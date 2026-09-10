@@ -1,12 +1,12 @@
 /* =========================================================
    SISTEM INVENTARIS RUANGAN
    FULL JAVASCRIPT V5.4
-   GOOGLE AUTH + LOCAL ADMIN
+   FIREBASE GOOGLE LOGIN + LOCAL ADMIN
 ========================================================= */
 
 
 /* =========================================================
-   FIREBASE SDK
+   FIREBASE
 ========================================================= */
 
 import {
@@ -16,8 +16,8 @@ import {
 import {
     getAuth,
     GoogleAuthProvider,
-    browserLocalPersistence,
     setPersistence,
+    browserLocalPersistence,
     signInWithPopup,
     signInWithRedirect,
     getRedirectResult,
@@ -65,27 +65,22 @@ const firebaseApp =
         firebaseConfig
     );
 
-
 const auth =
     getAuth(
         firebaseApp
     );
-
 
 const googleProvider =
     new GoogleAuthProvider();
 
 
 googleProvider.setCustomParameters({
-
-    prompt:
-        "select_account"
-
+    prompt: "select_account"
 });
 
 
 /* =========================================================
-   STORAGE KEY
+   STORAGE KEYS
 ========================================================= */
 
 const STORAGE_KEY =
@@ -139,9 +134,6 @@ const OLD_STORAGE_KEYS = [
 
 const FOOTER_CONFIG = {
 
-    supportBy:
-        "RPL Developer Team",
-
     github:
         "https://github.com/",
 
@@ -149,7 +141,10 @@ const FOOTER_CONFIG = {
         "https://www.linkedin.com/",
 
     phone:
-        "tel:+6281234567890"
+        "tel:+6281234567890",
+
+    supportBy:
+        "RPL Developer Team"
 
 };
 
@@ -171,6 +166,8 @@ let deferredInstallPrompt = null;
 let isAdminLoggedIn = false;
 
 let currentGoogleUser = null;
+
+let googleLoginInProgress = false;
 
 
 /* =========================================================
@@ -220,6 +217,8 @@ async function init() {
 
         updateFooterYear();
 
+        setupFooterLinks();
+
         hideSplash();
 
         registerServiceWorker();
@@ -236,7 +235,7 @@ async function init() {
         );
 
         showToast(
-            "Terjadi error saat memuat aplikasi.",
+            "Terjadi error saat memuat sistem.",
             "error"
         );
 
@@ -261,11 +260,13 @@ async function setupFirebaseAuth() {
         );
 
 
+        /*
+           Dengarkan perubahan status login.
+        */
+
         onAuthStateChanged(
             auth,
-            function (
-                user
-            ) {
+            function (user) {
 
                 handleFirebaseUser(
                     user
@@ -275,17 +276,23 @@ async function setupFirebaseAuth() {
         );
 
 
+        /*
+           Cek hasil redirect.
+           Ini berguna kalau popup fallback
+           digunakan atau login dari mobile.
+        */
+
         try {
 
-            const redirectResult =
+            const result =
                 await getRedirectResult(
                     auth
                 );
 
 
             if (
-                redirectResult &&
-                redirectResult.user
+                result &&
+                result.user
             ) {
 
                 console.log(
@@ -296,18 +303,16 @@ async function setupFirebaseAuth() {
 
         }
 
-        catch (
-            redirectError
-        ) {
+        catch (error) {
 
             if (
-                redirectError.code !==
+                error.code !==
                 "auth/no-auth-event"
             ) {
 
                 console.warn(
-                    "Redirect result:",
-                    redirectError
+                    "Redirect result error:",
+                    error
                 );
 
             }
@@ -316,17 +321,16 @@ async function setupFirebaseAuth() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
-            "Firebase Authentication setup error:",
+            "Firebase Auth setup error:",
             error
         );
 
+
         setGoogleStatus(
-            "Firebase Authentication belum siap.",
+            "Firebase Authentication gagal dimuat.",
             true
         );
 
@@ -348,40 +352,24 @@ function handleFirebaseUser(
         user || null;
 
 
-    /* =====================================================
-       GOOGLE LOGIN AKTIF
-    ===================================================== */
-
     if (
         user
     ) {
 
         /*
-           User sudah berhasil
-           terautentikasi oleh Firebase.
-
-           Karena aturan project kamu:
-           semua user Google langsung
-           menjadi Admin.
+           SEMUA USER YANG BERHASIL LOGIN GOOGLE
+           LANGSUNG MENJADI ADMIN.
         */
 
         isAdminLoggedIn =
             true;
 
 
-        /*
-           Simpan status login.
-        */
-
         localStorage.setItem(
             AUTH_KEY,
             "google-admin"
         );
 
-
-        /*
-           Simpan data akun Google.
-        */
 
         localStorage.setItem(
             GOOGLE_USER_KEY,
@@ -404,16 +392,8 @@ function handleFirebaseUser(
         );
 
 
-        /*
-           Update UI.
-        */
-
         updateAuthUI();
 
-
-        /*
-           Tampilkan akun Google.
-        */
 
         showGoogleAccount(
             user
@@ -421,15 +401,14 @@ function handleFirebaseUser(
 
 
         /*
-           Jangan spam toast setiap refresh.
-           Hanya tampilkan ketika modal login
-           sedang terbuka atau akun baru berubah.
+           Tutup modal setelah login.
         */
 
         if (
-            $("loginModal")?.classList.contains(
-                "show"
-            )
+            $("loginModal")
+                ?.classList.contains(
+                    "show"
+                )
         ) {
 
             closeLoginModal();
@@ -443,17 +422,11 @@ function handleFirebaseUser(
 
     }
 
-
-    /* =====================================================
-       GOOGLE LOGOUT
-    ===================================================== */
-
     else {
 
         /*
-           Kalau tidak ada user Google,
-           cek apakah user masih login
-           menggunakan akun lokal.
+           Jika tidak ada akun Firebase,
+           cek login lokal.
         */
 
         const localAuth =
@@ -495,6 +468,7 @@ function handleFirebaseUser(
 
         updateAuthUI();
 
+
         clearGoogleAccount();
 
     }
@@ -503,10 +477,28 @@ function handleFirebaseUser(
 
 
 /* =========================================================
-   LOGIN GOOGLE
+   GOOGLE LOGIN
+   VERSI ANTI "MACET DI MEMBUKA LOGIN"
 ========================================================= */
 
 async function loginWithGoogle() {
+
+    /*
+       Jangan membuat dua popup sekaligus.
+    */
+
+    if (
+        googleLoginInProgress
+    ) {
+
+        return;
+
+    }
+
+
+    googleLoginInProgress =
+        true;
+
 
     const button =
         $("googleLoginButton");
@@ -533,47 +525,125 @@ async function loginWithGoogle() {
         );
 
 
+        console.log(
+            "[Google Auth] Memulai login..."
+        );
+
+
         /*
-           Desktop / laptop
-           menggunakan popup.
+           DESKTOP/LAPTOP
+           Selalu coba popup.
         */
 
-        if (
-            window.innerWidth >
-            700
-        ) {
-
+        const result =
             await signInWithPopup(
                 auth,
                 googleProvider
             );
 
-        }
-
 
         /*
-           Mobile
-           menggunakan redirect.
+           Kalau sampai sini berarti berhasil.
         */
 
-        else {
+        if (
+            result &&
+            result.user
+        ) {
 
-            await signInWithRedirect(
-                auth,
-                googleProvider
+            console.log(
+                "[Google Auth] Login berhasil:",
+                result.user.email
+            );
+
+
+            isAdminLoggedIn =
+                true;
+
+
+            currentGoogleUser =
+                result.user;
+
+
+            localStorage.setItem(
+                AUTH_KEY,
+                "google-admin"
+            );
+
+
+            localStorage.setItem(
+                GOOGLE_USER_KEY,
+                JSON.stringify({
+
+                    uid:
+                        result.user.uid,
+
+                    email:
+                        result.user.email,
+
+                    displayName:
+                        result.user.displayName,
+
+                    photoURL:
+                        result.user.photoURL
+
+                })
+            );
+
+
+            updateAuthUI();
+
+
+            showGoogleAccount(
+                result.user
+            );
+
+
+            closeLoginModal();
+
+
+            addActivity(
+                `Login Google: ${result.user.email}`,
+                "fa-google"
+            );
+
+
+            showToast(
+                `Login berhasil. Selamat datang ${result.user.displayName || "Admin"}!`,
+                "success"
             );
 
         }
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
-            "Google Login Error:",
+            "================================="
+        );
+
+        console.error(
+            "GOOGLE LOGIN ERROR"
+        );
+
+        console.error(
+            "CODE:",
+            error.code
+        );
+
+        console.error(
+            "MESSAGE:",
+            error.message
+        );
+
+        console.error(
+            "FULL ERROR:",
             error
+        );
+
+        console.error(
+            "================================="
         );
 
 
@@ -585,22 +655,6 @@ async function loginWithGoogle() {
             error.code
         ) {
 
-            case "auth/popup-closed-by-user":
-
-                message =
-                    "Login Google dibatalkan.";
-
-                break;
-
-
-            case "auth/popup-blocked":
-
-                message =
-                    "Popup Google diblokir browser.";
-
-                break;
-
-
             case "auth/unauthorized-domain":
 
                 message =
@@ -609,10 +663,26 @@ async function loginWithGoogle() {
                 break;
 
 
-            case "auth/account-exists-with-different-credential":
+            case "auth/popup-blocked":
 
                 message =
-                    "Akun sudah terdaftar dengan metode login lain.";
+                    "Popup Google diblokir browser. Izinkan popup untuk website ini.";
+
+                break;
+
+
+            case "auth/popup-closed-by-user":
+
+                message =
+                    "Jendela login Google ditutup.";
+
+                break;
+
+
+            case "auth/cancelled-popup-request":
+
+                message =
+                    "Permintaan login Google dibatalkan.";
 
                 break;
 
@@ -625,10 +695,34 @@ async function loginWithGoogle() {
                 break;
 
 
-            case "auth/cancelled-popup-request":
+            case "auth/operation-not-allowed":
 
                 message =
-                    "Permintaan login dibatalkan.";
+                    "Login Google belum diaktifkan di Firebase.";
+
+                break;
+
+
+            case "auth/internal-error":
+
+                message =
+                    "Firebase mengalami error internal. Coba refresh halaman.";
+
+                break;
+
+
+            case "auth/web-storage-unsupported":
+
+                message =
+                    "Browser tidak mendukung storage yang diperlukan Firebase.";
+
+                break;
+
+
+            case "auth/too-many-requests":
+
+                message =
+                    "Terlalu banyak percobaan login. Coba beberapa saat lagi.";
 
                 break;
 
@@ -637,7 +731,7 @@ async function loginWithGoogle() {
 
                 message =
                     error.message ||
-                    message;
+                    "Login Google gagal.";
 
         }
 
@@ -653,9 +747,28 @@ async function loginWithGoogle() {
             "error"
         );
 
+
+        /*
+           Kalau popup diblokir,
+           tampilkan tombol redirect.
+        */
+
+        if (
+            error.code ===
+            "auth/popup-blocked"
+        ) {
+
+            showGoogleRedirectOption();
+
+        }
+
     }
 
     finally {
+
+        googleLoginInProgress =
+            false;
+
 
         if (
             button
@@ -676,6 +789,110 @@ async function loginWithGoogle() {
 
 
 /* =========================================================
+   GOOGLE REDIRECT FALLBACK
+========================================================= */
+
+async function loginWithGoogleRedirect() {
+
+    try {
+
+        setGoogleStatus(
+            "Mengalihkan ke Google..."
+        );
+
+
+        await signInWithRedirect(
+            auth,
+            googleProvider
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Google redirect error:",
+            error
+        );
+
+
+        showToast(
+            error.message ||
+            "Redirect Google gagal.",
+            "error"
+        );
+
+
+        setGoogleStatus(
+            error.message ||
+            "Redirect Google gagal.",
+            true
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   SHOW REDIRECT OPTION
+========================================================= */
+
+function showGoogleRedirectOption() {
+
+    const container =
+        $("googleLoginStatus");
+
+
+    if (
+        !container
+    ) {
+
+        return;
+
+    }
+
+
+    container.innerHTML = `
+
+        <div class="google-status-message error">
+
+            <i
+                class="fa-solid fa-triangle-exclamation"
+            ></i>
+
+            Popup Google diblokir.
+
+        </div>
+
+
+        <button
+            id="googleRedirectButton"
+            type="button"
+            class="google-redirect-button"
+        >
+
+            <i
+                class="fa-solid fa-arrow-right"
+            ></i>
+
+            Lanjutkan dengan Redirect
+
+        </button>
+
+    `;
+
+
+    $("googleRedirectButton")
+        ?.addEventListener(
+            "click",
+            loginWithGoogleRedirect
+        );
+
+}
+
+
+/* =========================================================
    LOGOUT GOOGLE
 ========================================================= */
 
@@ -689,18 +906,11 @@ async function logoutGoogle() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
-            "Google logout error:",
+            "Firebase logout error:",
             error
-        );
-
-        showToast(
-            "Logout Google gagal.",
-            "error"
         );
 
     }
@@ -746,43 +956,71 @@ function showGoogleAccount(
 
     status.innerHTML = `
 
-        <div class="google-user-profile">
+        <div
+            class="google-user-profile"
+        >
 
             ${
                 photo
+
                     ? `
+
                         <img
                             src="${escapeHtml(
                                 photo
                             )}"
-                            alt="Foto profil Google"
+                            alt="Foto profil"
+                            referrerpolicy="no-referrer"
                         >
+
                       `
+
                     : `
-                        <div class="google-user-fallback">
-                            <i class="fa-solid fa-user"></i>
+
+                        <div
+                            class="google-user-fallback"
+                        >
+
+                            <i
+                                class="fa-solid fa-user"
+                            ></i>
+
                         </div>
+
                       `
             }
 
 
-            <div class="google-user-info">
+            <div
+                class="google-user-info"
+            >
 
                 <strong>
+
                     ${escapeHtml(
                         name
                     )}
+
                 </strong>
 
+
                 <span>
+
                     ${escapeHtml(
                         email
                     )}
+
                 </span>
 
+
                 <small>
-                    <i class="fa-solid fa-circle-check"></i>
+
+                    <i
+                        class="fa-solid fa-circle-check"
+                    ></i>
+
                     Google Admin
+
                 </small>
 
             </div>
@@ -838,15 +1076,6 @@ function setGoogleStatus(
     }
 
 
-    if (
-        !message
-    ) {
-
-        return;
-
-    }
-
-
     element.innerHTML = `
 
         <div
@@ -857,15 +1086,13 @@ function setGoogleStatus(
             }"
         >
 
-            ${
-                error
-                    ? `
-                        <i class="fa-solid fa-circle-xmark"></i>
-                      `
-                    : `
-                        <i class="fa-solid fa-circle-info"></i>
-                      `
-            }
+            <i
+                class="fa-solid ${
+                    error
+                        ? "fa-circle-xmark"
+                        : "fa-circle-info"
+                }"
+            ></i>
 
             ${escapeHtml(
                 message
@@ -879,7 +1106,7 @@ function setGoogleStatus(
 
 
 /* =========================================================
-   LOAD LOCAL AUTH
+   LOCAL AUTH
 ========================================================= */
 
 function loadLocalAuth() {
@@ -986,7 +1213,7 @@ function updateAuthUI() {
 
             button.title =
                 currentGoogleUser
-                    ? "Google Admin - Logout"
+                    ? "Google Admin - Klik untuk logout"
                     : "Logout Admin";
 
         }
@@ -1041,15 +1268,10 @@ function updateAuthUI() {
 
 
 /* =========================================================
-   OPEN LOGIN MODAL
+   LOGIN MODAL
 ========================================================= */
 
 function openLoginModal() {
-
-    /*
-       Kalau sudah admin,
-       tombol berfungsi sebagai logout.
-    */
 
     if (
         isAdminLoggedIn
@@ -1062,8 +1284,14 @@ function openLoginModal() {
     }
 
 
-    $("loginForm")
-        ?.reset();
+    if (
+        $("loginForm")
+    ) {
+
+        $("loginForm")
+            .reset();
+
+    }
 
 
     if (
@@ -1105,7 +1333,7 @@ function openLoginModal() {
 
 
 /* =========================================================
-   CLOSE LOGIN MODAL
+   CLOSE LOGIN
 ========================================================= */
 
 function closeLoginModal() {
@@ -1154,11 +1382,6 @@ function handleLoginSubmit(
         ADMIN_PASSWORD
     ) {
 
-        /*
-           Jika sebelumnya ada akun Google,
-           logout Firebase dulu.
-        */
-
         if (
             currentGoogleUser
         ) {
@@ -1171,7 +1394,7 @@ function handleLoginSubmit(
                 ) {
 
                     console.warn(
-                        "Google logout:",
+                        "Google signout:",
                         error
                     );
 
@@ -1256,40 +1479,18 @@ function handleLoginSubmit(
 
 async function logoutAdmin() {
 
-    const authState =
+    const state =
         localStorage.getItem(
             AUTH_KEY
         );
 
 
-    /*
-       Logout Firebase
-       jika login berasal dari Google.
-    */
-
     if (
-        authState ===
+        state ===
         "google-admin"
     ) {
 
-        try {
-
-            await signOut(
-                auth
-            );
-
-        }
-
-        catch (
-            error
-        ) {
-
-            console.error(
-                "Firebase logout error:",
-                error
-            );
-
-        }
+        await logoutGoogle();
 
     }
 
@@ -1340,7 +1541,7 @@ async function logoutAdmin() {
 
 
 /* =========================================================
-   ADMIN SECURITY CHECK
+   REQUIRE ADMIN
 ========================================================= */
 
 function requireAdmin(
@@ -1372,14 +1573,12 @@ function requireAdmin(
 
 
 /* =========================================================
-   EVENT BINDING
+   EVENTS
 ========================================================= */
 
 function bindEvents() {
 
-    /* =====================================================
-       LOGIN
-    ===================================================== */
+    /* LOGIN */
 
     $("loginButton")
         ?.addEventListener(
@@ -1443,9 +1642,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       NAVIGATION
-    ===================================================== */
+    /* NAVIGATION */
 
     document
         .querySelectorAll(
@@ -1471,9 +1668,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       MOBILE MENU
-    ===================================================== */
+    /* MOBILE */
 
     $("mobileMenuButton")
         ?.addEventListener(
@@ -1489,9 +1684,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       THEME
-    ===================================================== */
+    /* THEME */
 
     $("themeButton")
         ?.addEventListener(
@@ -1507,9 +1700,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       ADD INVENTORY
-    ===================================================== */
+    /* ADD */
 
     $("quickAddButton")
         ?.addEventListener(
@@ -1539,9 +1730,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       MONITORING
-    ===================================================== */
+    /* MONITOR */
 
     $("heroMonitorButton")
         ?.addEventListener(
@@ -1556,9 +1745,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       INVENTORY MODAL
-    ===================================================== */
+    /* INVENTORY */
 
     $("closeModalButton")
         ?.addEventListener(
@@ -1581,9 +1768,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       SEARCH
-    ===================================================== */
+    /* SEARCH */
 
     $("searchInput")
         ?.addEventListener(
@@ -1620,9 +1805,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       CONFIRM
-    ===================================================== */
+    /* CONFIRM */
 
     $("confirmCancel")
         ?.addEventListener(
@@ -1656,9 +1839,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       EXPORT
-    ===================================================== */
+    /* EXPORT */
 
     $("exportButton")
         ?.addEventListener(
@@ -1667,9 +1848,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       BACKUP
-    ===================================================== */
+    /* BACKUP */
 
     $("backupButton")
         ?.addEventListener(
@@ -1678,9 +1857,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       RESTORE
-    ===================================================== */
+    /* RESTORE */
 
     $("restoreButton")
         ?.addEventListener(
@@ -1701,9 +1878,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       PRINT
-    ===================================================== */
+    /* PRINT */
 
     $("printButton")
         ?.addEventListener(
@@ -1716,9 +1891,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       ACTIVITY
-    ===================================================== */
+    /* ACTIVITY */
 
     $("clearActivityButton")
         ?.addEventListener(
@@ -1727,9 +1900,14 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       PWA
-    ===================================================== */
+    /* INSTALL */
+
+    $("installButton")
+        ?.addEventListener(
+            "click",
+            installPWA
+        );
+
 
     window.addEventListener(
         "beforeinstallprompt",
@@ -1753,16 +1931,7 @@ function bindEvents() {
     );
 
 
-    $("installButton")
-        ?.addEventListener(
-            "click",
-            installPWA
-        );
-
-
-    /* =====================================================
-       GPS
-    ===================================================== */
+    /* GPS */
 
     $("footerGpsButton")
         ?.addEventListener(
@@ -1771,9 +1940,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       KEYBOARD
-    ===================================================== */
+    /* KEYBOARD */
 
     document.addEventListener(
         "keydown",
@@ -1816,9 +1983,7 @@ function bindEvents() {
     );
 
 
-    /* =====================================================
-       INVENTORY OUTSIDE CLICK
-    ===================================================== */
+    /* OUTSIDE INVENTORY */
 
     $("inventoryModal")
         ?.addEventListener(
@@ -1840,9 +2005,7 @@ function bindEvents() {
         );
 
 
-    /* =====================================================
-       CONFIRM OUTSIDE CLICK
-    ===================================================== */
+    /* OUTSIDE CONFIRM */
 
     $("confirmModal")
         ?.addEventListener(
@@ -1890,21 +2053,31 @@ function togglePassword() {
     }
 
 
-    const visible =
+    const show =
         input.type ===
         "password";
 
 
     input.type =
-        visible
+        show
             ? "text"
             : "password";
 
 
     button.innerHTML =
-        visible
-            ? '<i class="fa-solid fa-eye-slash"></i>'
-            : '<i class="fa-solid fa-eye"></i>';
+        show
+
+            ? `
+                <i
+                    class="fa-solid fa-eye-slash"
+                ></i>
+              `
+
+            : `
+                <i
+                    class="fa-solid fa-eye"
+                ></i>
+              `;
 
 }
 
@@ -2077,18 +2250,18 @@ function loadData() {
 
         inventoryData =
             saved
+
                 ? normalizeData(
                     JSON.parse(
                         saved
                     )
                 )
+
                 : [];
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
             "Load data error:",
@@ -2209,7 +2382,7 @@ function normalizeData(
 
 
 /* =========================================================
-   NORMALIZE CONDITION
+   CONDITION
 ========================================================= */
 
 function normalizeCondition(
@@ -2221,7 +2394,7 @@ function normalizeCondition(
             value ||
             "Baik"
         )
-        .toLowerCase();
+            .toLowerCase();
 
 
     if (
@@ -2268,9 +2441,7 @@ function saveData() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
             "Save data error:",
@@ -2490,7 +2661,7 @@ function closeInventoryModal() {
 
 
 /* =========================================================
-   INVENTORY FORM
+   SUBMIT INVENTORY
 ========================================================= */
 
 function handleFormSubmit(
@@ -2895,8 +3066,8 @@ function renderInventory() {
                 ?.value ||
             ""
         )
-        .toLowerCase()
-        .trim();
+            .toLowerCase()
+            .trim();
 
 
     const room =
@@ -2983,70 +3154,87 @@ function renderInventory() {
             b
         ) {
 
-            switch (
-                sort
+            if (
+                sort ===
+                "oldest"
             ) {
 
-                case "oldest":
-
-                    return (
-                        new Date(
-                            a.tanggal
-                        ) -
-                        new Date(
-                            b.tanggal
-                        )
-                    );
-
-
-                case "nameAsc":
-
-                    return (
-                        a.nama.localeCompare(
-                            b.nama,
-                            "id"
-                        )
-                    );
-
-
-                case "nameDesc":
-
-                    return (
-                        b.nama.localeCompare(
-                            a.nama,
-                            "id"
-                        )
-                    );
-
-
-                case "stockHigh":
-
-                    return (
-                        b.jumlah -
-                        a.jumlah
-                    );
-
-
-                case "stockLow":
-
-                    return (
-                        a.jumlah -
-                        b.jumlah
-                    );
-
-
-                default:
-
-                    return (
-                        new Date(
-                            b.tanggal
-                        ) -
-                        new Date(
-                            a.tanggal
-                        )
-                    );
+                return (
+                    new Date(
+                        a.tanggal
+                    ) -
+                    new Date(
+                        b.tanggal
+                    )
+                );
 
             }
+
+
+            if (
+                sort ===
+                "nameAsc"
+            ) {
+
+                return (
+                    a.nama.localeCompare(
+                        b.nama,
+                        "id"
+                    )
+                );
+
+            }
+
+
+            if (
+                sort ===
+                "nameDesc"
+            ) {
+
+                return (
+                    b.nama.localeCompare(
+                        a.nama,
+                        "id"
+                    )
+                );
+
+            }
+
+
+            if (
+                sort ===
+                "stockHigh"
+            ) {
+
+                return (
+                    b.jumlah -
+                    a.jumlah
+                );
+
+            }
+
+
+            if (
+                sort ===
+                "stockLow"
+            ) {
+
+                return (
+                    a.jumlah -
+                    b.jumlah
+                );
+
+            }
+
+
+            return (
+                new Date(
+                    b.tanggal
+                ) -
+                new Date(
+                    a.tanggal
+                )
+            );
 
         }
     );
@@ -3071,7 +3259,9 @@ function renderInventory() {
 
                 <td>
 
-                    <span class="code-badge">
+                    <span
+                        class="code-badge"
+                    >
 
                         ${escapeHtml(
                             item.kodeInventaris
@@ -3146,13 +3336,14 @@ function renderInventory() {
 
                 <td>
 
-                    <div class="action-buttons">
+                    <div
+                        class="action-buttons"
+                    >
 
                         <button
                             class="icon-button edit-button"
                             type="button"
                             title="Edit inventaris"
-                            aria-label="Edit inventaris"
                         >
 
                             <i
@@ -3166,7 +3357,6 @@ function renderInventory() {
                             class="icon-button delete delete-button"
                             type="button"
                             title="Hapus inventaris"
-                            aria-label="Hapus inventaris"
                         >
 
                             <i
@@ -3257,17 +3447,31 @@ function updateDashboard() {
 
     const good =
         inventoryData.filter(
-            item =>
-                item.kondisi ===
-                "Baik"
+            function (
+                item
+            ) {
+
+                return (
+                    item.kondisi ===
+                    "Baik"
+                );
+
+            }
         ).length;
 
 
     const attention =
         inventoryData.filter(
-            item =>
-                item.kondisi !==
-                "Baik"
+            function (
+                item
+            ) {
+
+                return (
+                    item.kondisi !==
+                    "Baik"
+                );
+
+            }
         ).length;
 
 
@@ -3387,6 +3591,39 @@ function updateHealth() {
         }
 
 
+        if (
+            $("healthGoodCount")
+        ) {
+
+            $("healthGoodCount")
+                .textContent =
+                "0";
+
+        }
+
+
+        if (
+            $("healthLightCount")
+        ) {
+
+            $("healthLightCount")
+                .textContent =
+                "0";
+
+        }
+
+
+        if (
+            $("healthHeavyCount")
+        ) {
+
+            $("healthHeavyCount")
+                .textContent =
+                "0";
+
+        }
+
+
         return;
 
     }
@@ -3401,11 +3638,8 @@ function updateHealth() {
                 return (
 
                     item.kodeInventaris &&
-
                     item.nama &&
-
                     item.kategori &&
-
                     item.ruangan
 
                 );
@@ -3414,7 +3648,7 @@ function updateHealth() {
         ).length;
 
 
-    const percent =
+    const percentage =
         Math.round(
             complete /
             inventoryData.length *
@@ -3428,7 +3662,7 @@ function updateHealth() {
 
         $("dataHealth")
             .textContent =
-            `${percent}%`;
+            `${percentage}%`;
 
     }
 
@@ -3439,7 +3673,7 @@ function updateHealth() {
 
         $("healthProgress")
             .style.width =
-            `${percent}%`;
+            `${percentage}%`;
 
     }
 
@@ -3504,7 +3738,7 @@ function updateHealth() {
 
 
 /* =========================================================
-   RECENT ITEMS
+   RECENT
 ========================================================= */
 
 function renderRecent() {
@@ -3917,39 +4151,6 @@ function updateMonitoring() {
 
 
     if (
-        $("healthGoodCount")
-    ) {
-
-        $("healthGoodCount")
-            .textContent =
-            good;
-
-    }
-
-
-    if (
-        $("healthLightCount")
-    ) {
-
-        $("healthLightCount")
-            .textContent =
-            light;
-
-    }
-
-
-    if (
-        $("healthHeavyCount")
-    ) {
-
-        $("healthHeavyCount")
-            .textContent =
-            heavy;
-
-    }
-
-
-    if (
         $("monitorHealthGood")
     ) {
 
@@ -4076,10 +4277,10 @@ function renderRooms() {
         Math.max(
             ...rooms.map(
                 function (
-                    item
+                    entry
                 ) {
 
-                    return item[1];
+                    return entry[1];
 
                 }
             ),
@@ -4095,14 +4296,14 @@ function renderRooms() {
             )
             .map(
                 function (
-                    roomDataEntry
+                    entry
                 ) {
 
                     const room =
-                        roomDataEntry[0];
+                        entry[0];
 
                     const count =
-                        roomDataEntry[1];
+                        entry[1];
 
 
                     const width =
@@ -4129,6 +4330,7 @@ function renderRooms() {
 
                             </div>
 
+
                             <div
                                 class="room-bar"
                             >
@@ -4138,6 +4340,7 @@ function renderRooms() {
                                 ></div>
 
                             </div>
+
 
                             <strong>
 
@@ -4168,46 +4371,25 @@ function renderStatistics() {
 
     const good =
         inventoryData.filter(
-            function (
-                item
-            ) {
-
-                return (
-                    item.kondisi ===
-                    "Baik"
-                );
-
-            }
+            item =>
+                item.kondisi ===
+                "Baik"
         ).length;
 
 
     const light =
         inventoryData.filter(
-            function (
-                item
-            ) {
-
-                return (
-                    item.kondisi ===
-                    "Ringan"
-                );
-
-            }
+            item =>
+                item.kondisi ===
+                "Ringan"
         ).length;
 
 
     const heavy =
         inventoryData.filter(
-            function (
-                item
-            ) {
-
-                return (
-                    item.kondisi ===
-                    "Berat"
-                );
-
-            }
+            item =>
+                item.kondisi ===
+                "Berat"
         ).length;
 
 
@@ -4413,10 +4595,10 @@ function renderCategories() {
         Math.max(
             ...list.map(
                 function (
-                    entry
+                    item
                 ) {
 
-                    return entry[1];
+                    return item[1];
 
                 }
             ),
@@ -4492,7 +4674,7 @@ function renderCategories() {
 
 
 /* =========================================================
-   ACTIVITY LOAD
+   ACTIVITY
 ========================================================= */
 
 function loadActivity() {
@@ -4526,14 +4708,7 @@ function loadActivity() {
 
     }
 
-    catch (
-        error
-    ) {
-
-        console.warn(
-            "Activity loading error:",
-            error
-        );
+    catch (error) {
 
         activityData =
             [];
@@ -4542,10 +4717,6 @@ function loadActivity() {
 
 }
 
-
-/* =========================================================
-   ACTIVITY SAVE
-========================================================= */
 
 function saveActivity() {
 
@@ -4563,9 +4734,7 @@ function saveActivity() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
             "Activity save error:",
@@ -4576,10 +4745,6 @@ function saveActivity() {
 
 }
 
-
-/* =========================================================
-   ADD ACTIVITY
-========================================================= */
 
 function addActivity(
     text,
@@ -4618,10 +4783,6 @@ function addActivity(
 
 }
 
-
-/* =========================================================
-   RENDER ACTIVITY
-========================================================= */
 
 function renderActivity() {
 
@@ -4695,6 +4856,7 @@ function renderActivity() {
 
                                 </strong>
 
+
                                 <span>
                                     Sistem Inventaris
                                 </span>
@@ -4724,7 +4886,7 @@ function renderActivity() {
 
 
 /* =========================================================
-   STORAGE MONITOR
+   STORAGE
 ========================================================= */
 
 function updateStorage() {
@@ -4784,9 +4946,7 @@ function updateStorage() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         if (
             $("monitorStorage")
@@ -4844,9 +5004,7 @@ function createAutoBackup() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
             "Auto backup error:",
@@ -4948,101 +5106,104 @@ function handleRestore(
     readJSON(
         file
     )
-        .then(
-            function (
-                data
+
+    .then(
+        function (
+            data
+        ) {
+
+            if (
+                !data ||
+                !Array.isArray(
+                    data.inventory
+                )
             ) {
 
-                if (
-                    !data ||
-                    !Array.isArray(
-                        data.inventory
-                    )
-                ) {
+                throw new Error(
+                    "Backup tidak valid."
+                );
 
-                    throw new Error(
-                        "Backup tidak valid."
+            }
+
+
+            openConfirmModal(
+                "Restore Backup",
+                "Data saat ini akan diganti dengan isi backup.",
+                function () {
+
+                    createAutoBackup();
+
+
+                    inventoryData =
+                        normalizeData(
+                            data.inventory
+                        );
+
+
+                    if (
+                        Array.isArray(
+                            data.activities
+                        )
+                    ) {
+
+                        activityData =
+                            data.activities;
+
+                        saveActivity();
+
+                    }
+
+
+                    saveData();
+
+
+                    renderAll();
+
+
+                    addActivity(
+                        "Memulihkan backup",
+                        "fa-clock-rotate-left"
+                    );
+
+
+                    showToast(
+                        "Backup berhasil dipulihkan.",
+                        "success"
                     );
 
                 }
+            );
 
+        }
+    )
 
-                openConfirmModal(
-                    "Restore Backup",
-                    "Data saat ini akan diganti dengan isi backup.",
-                    function () {
+    .catch(
+        function (
+            error
+        ) {
 
-                        createAutoBackup();
-
-
-                        inventoryData =
-                            normalizeData(
-                                data.inventory
-                            );
-
-
-                        if (
-                            Array.isArray(
-                                data.activities
-                            )
-                        ) {
-
-                            activityData =
-                                data.activities;
-
-                            saveActivity();
-
-                        }
-
-
-                        saveData();
-
-
-                        renderAll();
-
-
-                        addActivity(
-                            "Memulihkan backup",
-                            "fa-clock-rotate-left"
-                        );
-
-
-                        showToast(
-                            "Backup berhasil dipulihkan.",
-                            "success"
-                        );
-
-                    }
-                );
-
-            }
-        )
-        .catch(
-            function (
+            console.error(
+                "Restore error:",
                 error
-            ) {
-
-                console.error(
-                    "Restore error:",
-                    error
-                );
+            );
 
 
-                showToast(
-                    "File backup tidak valid.",
-                    "error"
-                );
+            showToast(
+                "File backup tidak valid.",
+                "error"
+            );
 
-            }
-        )
-        .finally(
-            function () {
+        }
+    )
 
-                event.target.value =
-                    "";
+    .finally(
+        function () {
 
-            }
-        );
+            event.target.value =
+                "";
+
+        }
+    );
 
 }
 
@@ -5127,20 +5288,22 @@ function exportCSV() {
             headers,
             ...rows
         ]
-            .map(
-                function (
-                    row
-                ) {
 
-                    return row
-                        .map(
-                            csvEscape
-                        )
-                        .join(",");
+        .map(
+            function (
+                row
+            ) {
 
-                }
-            )
-            .join("\n");
+                return row
+                    .map(
+                        csvEscape
+                    )
+                    .join(",");
+
+            }
+        )
+
+        .join("\n");
 
 
     downloadFile(
@@ -5369,7 +5532,7 @@ function updateThemeUI(
                         class="fa-solid fa-toggle-on"
                     ></i>
 
-                `
+                  `
 
                 : `
 
@@ -5387,7 +5550,7 @@ function updateThemeUI(
                         class="fa-solid fa-toggle-off"
                     ></i>
 
-                `;
+                  `;
 
     }
 
@@ -5458,18 +5621,18 @@ function openGPS() {
                 position.coords.longitude;
 
 
-            const url =
+            const mapsURL =
                 `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 
 
             addActivity(
-                "Membuka GPS",
+                "Membuka lokasi GPS",
                 "fa-location-dot"
             );
 
 
             window.open(
-                url,
+                mapsURL,
                 "_blank",
                 "noopener,noreferrer"
             );
@@ -5497,10 +5660,9 @@ function openGPS() {
             ) {
 
                 message =
-                    "Izin lokasi ditolak. Izinkan akses lokasi pada browser.";
+                    "Izin lokasi ditolak. Izinkan akses lokasi browser.";
 
             }
-
 
             else if (
                 error.code ===
@@ -5511,7 +5673,6 @@ function openGPS() {
                     "Lokasi perangkat tidak tersedia.";
 
             }
-
 
             else if (
                 error.code ===
@@ -5551,6 +5712,62 @@ function openGPS() {
 
 
 /* =========================================================
+   FOOTER LINKS
+========================================================= */
+
+function setupFooterLinks() {
+
+    const github =
+        document.querySelector(
+            ".footer-social .github"
+        );
+
+
+    const linkedin =
+        document.querySelector(
+            ".footer-social .linkedin"
+        );
+
+
+    const phone =
+        document.querySelector(
+            ".footer-social .phone"
+        );
+
+
+    if (
+        github
+    ) {
+
+        github.href =
+            FOOTER_CONFIG.github;
+
+    }
+
+
+    if (
+        linkedin
+    ) {
+
+        linkedin.href =
+            FOOTER_CONFIG.linkedin;
+
+    }
+
+
+    if (
+        phone
+    ) {
+
+        phone.href =
+            FOOTER_CONFIG.phone;
+
+    }
+
+}
+
+
+/* =========================================================
    PWA INSTALL
 ========================================================= */
 
@@ -5561,7 +5778,7 @@ async function installPWA() {
     ) {
 
         showToast(
-            "Install App belum tersedia pada browser ini.",
+            "Install App belum tersedia.",
             "info"
         );
 
@@ -5579,12 +5796,10 @@ async function installPWA() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.warn(
-            "Install prompt error:",
+            "Install error:",
             error
         );
 
@@ -5611,8 +5826,8 @@ async function registerServiceWorker() {
 
     if (
         !(
-            "serviceWorker" in
-            navigator
+            "serviceWorker"
+            in navigator
         )
     ) {
 
@@ -5644,9 +5859,7 @@ async function registerServiceWorker() {
 
     }
 
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.warn(
             "Service Worker error:",
@@ -5758,7 +5971,7 @@ function renderAll() {
 
 
 /* =========================================================
-   SPLASH SCREEN
+   SPLASH
 ========================================================= */
 
 function hideSplash() {
@@ -5806,7 +6019,7 @@ function hideSplash() {
 
 
 /* =========================================================
-   CREATE ID
+   UTILITIES
 ========================================================= */
 
 function createId() {
@@ -5837,16 +6050,12 @@ function createId() {
 }
 
 
-/* =========================================================
-   CONDITION LABEL
-========================================================= */
-
 function conditionLabel(
-    condition
+    value
 ) {
 
     if (
-        condition ===
+        value ===
         "Ringan"
     ) {
 
@@ -5856,7 +6065,7 @@ function conditionLabel(
 
 
     if (
-        condition ===
+        value ===
         "Berat"
     ) {
 
@@ -5869,10 +6078,6 @@ function conditionLabel(
 
 }
 
-
-/* =========================================================
-   FORMAT DATE
-========================================================= */
 
 function formatDate(
     value
@@ -5914,10 +6119,6 @@ function formatDate(
 }
 
 
-/* =========================================================
-   FORMAT TIME
-========================================================= */
-
 function formatTime(
     value
 ) {
@@ -5954,10 +6155,6 @@ function formatTime(
 
 }
 
-
-/* =========================================================
-   LIVE CLOCK
-========================================================= */
 
 function updateClock() {
 
@@ -6020,10 +6217,6 @@ function updateClock() {
 }
 
 
-/* =========================================================
-   FILE DATE
-========================================================= */
-
 function fileDate() {
 
     const date =
@@ -6036,28 +6229,22 @@ function fileDate() {
 
         String(
             date.getMonth() + 1
-        )
-            .padStart(
-                2,
-                "0"
-            ),
+        ).padStart(
+            2,
+            "0"
+        ),
 
         String(
             date.getDate()
+        ).padStart(
+            2,
+            "0"
         )
-            .padStart(
-                2,
-                "0"
-            )
 
     ].join("-");
 
 }
 
-
-/* =========================================================
-   CSV ESCAPE
-========================================================= */
 
 function csvEscape(
     value
@@ -6096,10 +6283,6 @@ function csvEscape(
 
 }
 
-
-/* =========================================================
-   DOWNLOAD FILE
-========================================================= */
 
 function downloadFile(
     content,
@@ -6168,10 +6351,6 @@ function downloadFile(
 }
 
 
-/* =========================================================
-   READ JSON
-========================================================= */
-
 function readJSON(
     file
 ) {
@@ -6199,9 +6378,7 @@ function readJSON(
 
                     }
 
-                    catch (
-                        error
-                    ) {
+                    catch (error) {
 
                         reject(
                             error
@@ -6231,10 +6408,6 @@ function readJSON(
 
 }
 
-
-/* =========================================================
-   ESCAPE HTML
-========================================================= */
 
 function escapeHtml(
     value
@@ -6362,6 +6535,7 @@ function showToast(
             class="fa-solid ${icon}"
         ></i>
 
+
         <div>
 
             <strong>
@@ -6369,6 +6543,7 @@ function showToast(
                 ${title}
 
             </strong>
+
 
             <span>
 
@@ -6417,25 +6592,32 @@ function showToast(
             );
 
         },
-        3200
+        3500
     );
 
 }
 
 
 /* =========================================================
-   DEBUG HELPER
+   DEBUG ACCESS
 ========================================================= */
 
 window.inventoryApp = {
 
-    auth,
+    auth:
 
-    loginWithGoogle,
+        auth,
 
-    logoutGoogle,
+    loginGoogle:
 
-    getCurrentUser:
+        loginWithGoogle,
+
+    logoutGoogle:
+
+        logoutGoogle,
+
+    getUser:
+
         function () {
 
             return (
@@ -6443,13 +6625,16 @@ window.inventoryApp = {
                 null
             );
 
-    },
+        },
 
     isAdmin:
+
         function () {
 
-            return isAdminLoggedIn;
+            return (
+                isAdminLoggedIn
+            );
 
-    }
+        }
 
 };
