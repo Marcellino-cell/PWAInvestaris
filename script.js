@@ -1,12 +1,12 @@
 /* =========================================================
    SISTEM INVENTARIS RUANGAN
    FULL JAVASCRIPT V5.4
-   FIREBASE GOOGLE AUTH + LOCAL ADMIN
+   GOOGLE AUTH + LOCAL ADMIN
 ========================================================= */
 
 
 /* =========================================================
-   FIREBASE
+   FIREBASE SDK
 ========================================================= */
 
 import {
@@ -56,6 +56,10 @@ const firebaseConfig = {
 };
 
 
+/* =========================================================
+   FIREBASE INITIALIZATION
+========================================================= */
+
 const firebaseApp =
     initializeApp(
         firebaseConfig
@@ -72,16 +76,12 @@ const googleProvider =
     new GoogleAuthProvider();
 
 
-/* =========================================================
-   IMPORTANT
-   GANTI EMAIL INI DENGAN EMAIL GOOGLE KAMU
-========================================================= */
+googleProvider.setCustomParameters({
 
-const ADMIN_GOOGLE_EMAILS = [
+    prompt:
+        "select_account"
 
-    "GANTI_DENGAN_EMAIL_GOOGLE_KAMU@gmail.com"
-
-];
+});
 
 
 /* =========================================================
@@ -134,26 +134,7 @@ const OLD_STORAGE_KEYS = [
 
 
 /* =========================================================
-   GLOBAL
-========================================================= */
-
-let inventoryData = [];
-
-let activityData = [];
-
-let editingId = null;
-
-let confirmCallback = null;
-
-let deferredInstallPrompt = null;
-
-let isAdminLoggedIn = false;
-
-let currentGoogleUser = null;
-
-
-/* =========================================================
-   CONFIG FOOTER
+   FOOTER CONFIG
 ========================================================= */
 
 const FOOTER_CONFIG = {
@@ -174,12 +155,33 @@ const FOOTER_CONFIG = {
 
 
 /* =========================================================
+   GLOBAL STATE
+========================================================= */
+
+let inventoryData = [];
+
+let activityData = [];
+
+let editingId = null;
+
+let confirmCallback = null;
+
+let deferredInstallPrompt = null;
+
+let isAdminLoggedIn = false;
+
+let currentGoogleUser = null;
+
+
+/* =========================================================
    HELPER
 ========================================================= */
 
 function $(id) {
 
-    return document.getElementById(id);
+    return document.getElementById(
+        id
+    );
 
 }
 
@@ -275,15 +277,15 @@ async function setupFirebaseAuth() {
 
         try {
 
-            const result =
+            const redirectResult =
                 await getRedirectResult(
                     auth
                 );
 
 
             if (
-                result &&
-                result.user
+                redirectResult &&
+                redirectResult.user
             ) {
 
                 console.log(
@@ -319,7 +321,7 @@ async function setupFirebaseAuth() {
     ) {
 
         console.error(
-            "Firebase setup error:",
+            "Firebase Authentication setup error:",
             error
         );
 
@@ -334,7 +336,8 @@ async function setupFirebaseAuth() {
 
 
 /* =========================================================
-   FIREBASE USER HANDLER
+   FIREBASE USER STATE
+   SEMUA USER GOOGLE = ADMIN
 ========================================================= */
 
 function handleFirebaseUser(
@@ -345,31 +348,40 @@ function handleFirebaseUser(
         user || null;
 
 
+    /* =====================================================
+       GOOGLE LOGIN AKTIF
+    ===================================================== */
+
     if (
         user
     ) {
 
-        const email =
-            (
-                user.email ||
-                ""
-            )
-            .toLowerCase()
-            .trim();
+        /*
+           User sudah berhasil
+           terautentikasi oleh Firebase.
+
+           Karena aturan project kamu:
+           semua user Google langsung
+           menjadi Admin.
+        */
+
+        isAdminLoggedIn =
+            true;
 
 
-        const isAllowed =
-            ADMIN_GOOGLE_EMAILS
-                .map(
-                    item =>
-                        item
-                            .toLowerCase()
-                            .trim()
-                )
-                .includes(
-                    email
-                );
+        /*
+           Simpan status login.
+        */
 
+        localStorage.setItem(
+            AUTH_KEY,
+            "google-admin"
+        );
+
+
+        /*
+           Simpan data akun Google.
+        */
 
         localStorage.setItem(
             GOOGLE_USER_KEY,
@@ -379,69 +391,70 @@ function handleFirebaseUser(
                     user.uid,
 
                 email:
-                    user.email,
+                    user.email || "",
 
                 displayName:
-                    user.displayName,
+                    user.displayName ||
+                    "Google User",
 
                 photoURL:
-                    user.photoURL
+                    user.photoURL || ""
 
             })
         );
 
 
+        /*
+           Update UI.
+        */
+
+        updateAuthUI();
+
+
+        /*
+           Tampilkan akun Google.
+        */
+
+        showGoogleAccount(
+            user
+        );
+
+
+        /*
+           Jangan spam toast setiap refresh.
+           Hanya tampilkan ketika modal login
+           sedang terbuka atau akun baru berubah.
+        */
+
         if (
-            isAllowed
+            $("loginModal")?.classList.contains(
+                "show"
+            )
         ) {
 
-            isAdminLoggedIn =
-                true;
+            closeLoginModal();
 
-
-            localStorage.setItem(
-                AUTH_KEY,
-                "google-admin"
-            );
-
-
-            updateAuthUI();
-
-
-            showGoogleAccount(
-                user
-            );
-
-        }
-
-        else {
-
-            isAdminLoggedIn =
-                false;
-
-
-            localStorage.removeItem(
-                AUTH_KEY
-            );
-
-
-            updateAuthUI();
-
-
-            showGoogleAccount(
-                user,
-                false
+            showToast(
+                `Selamat datang, ${user.displayName || "Admin"}!`,
+                "success"
             );
 
         }
 
     }
 
+
+    /* =====================================================
+       GOOGLE LOGOUT
+    ===================================================== */
+
     else {
 
-        currentGoogleUser =
-            null;
-
+        /*
+           Kalau tidak ada user Google,
+           cek apakah user masih login
+           menggunakan akun lokal.
+        */
 
         const localAuth =
             localStorage.getItem(
@@ -450,9 +463,16 @@ function handleFirebaseUser(
 
 
         if (
-            localAuth !==
+            localAuth ===
             "local-admin"
         ) {
+
+            isAdminLoggedIn =
+                true;
+
+        }
+
+        else {
 
             isAdminLoggedIn =
                 false;
@@ -462,6 +482,10 @@ function handleFirebaseUser(
             );
 
         }
+
+
+        currentGoogleUser =
+            null;
 
 
         localStorage.removeItem(
@@ -479,7 +503,7 @@ function handleFirebaseUser(
 
 
 /* =========================================================
-   GOOGLE LOGIN
+   LOGIN GOOGLE
 ========================================================= */
 
 async function loginWithGoogle() {
@@ -494,24 +518,24 @@ async function loginWithGoogle() {
             button
         ) {
 
+            button.disabled =
+                true;
+
             button.classList.add(
                 "loading"
             );
-
-            button.disabled =
-                true;
 
         }
 
 
         setGoogleStatus(
-            "Membuka login Google..."
+            "Menghubungkan ke Google..."
         );
 
 
         /*
-           Desktop / laptop:
-           popup login.
+           Desktop / laptop
+           menggunakan popup.
         */
 
         if (
@@ -526,12 +550,13 @@ async function loginWithGoogle() {
 
         }
 
-        else {
 
-            /*
-               Mobile:
-               redirect login.
-            */
+        /*
+           Mobile
+           menggunakan redirect.
+        */
+
+        else {
 
             await signInWithRedirect(
                 auth,
@@ -563,7 +588,7 @@ async function loginWithGoogle() {
             case "auth/popup-closed-by-user":
 
                 message =
-                    "Jendela Google ditutup.";
+                    "Login Google dibatalkan.";
 
                 break;
 
@@ -584,10 +609,26 @@ async function loginWithGoogle() {
                 break;
 
 
+            case "auth/account-exists-with-different-credential":
+
+                message =
+                    "Akun sudah terdaftar dengan metode login lain.";
+
+                break;
+
+
             case "auth/network-request-failed":
 
                 message =
                     "Koneksi internet bermasalah.";
+
+                break;
+
+
+            case "auth/cancelled-popup-request":
+
+                message =
+                    "Permintaan login dibatalkan.";
 
                 break;
 
@@ -620,12 +661,12 @@ async function loginWithGoogle() {
             button
         ) {
 
+            button.disabled =
+                false;
+
             button.classList.remove(
                 "loading"
             );
-
-            button.disabled =
-                false;
 
         }
 
@@ -635,7 +676,7 @@ async function loginWithGoogle() {
 
 
 /* =========================================================
-   GOOGLE LOGOUT
+   LOGOUT GOOGLE
 ========================================================= */
 
 async function logoutGoogle() {
@@ -657,18 +698,22 @@ async function logoutGoogle() {
             error
         );
 
+        showToast(
+            "Logout Google gagal.",
+            "error"
+        );
+
     }
 
 }
 
 
 /* =========================================================
-   GOOGLE ACCOUNT UI
+   SHOW GOOGLE ACCOUNT
 ========================================================= */
 
 function showGoogleAccount(
-    user,
-    allowed = true
+    user
 ) {
 
     const status =
@@ -686,60 +731,87 @@ function showGoogleAccount(
 
     const name =
         user.displayName ||
-        user.email ||
         "Google User";
 
 
-    if (
-        allowed
-    ) {
+    const email =
+        user.email ||
+        "";
 
-        status.innerHTML = `
 
-            <span class="google-user-success">
+    const photo =
+        user.photoURL ||
+        "";
 
-                <i class="fa-solid fa-circle-check"></i>
 
-                Login sebagai
+    status.innerHTML = `
+
+        <div class="google-user-profile">
+
+            ${
+                photo
+                    ? `
+                        <img
+                            src="${escapeHtml(
+                                photo
+                            )}"
+                            alt="Foto profil Google"
+                        >
+                      `
+                    : `
+                        <div class="google-user-fallback">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                      `
+            }
+
+
+            <div class="google-user-info">
+
                 <strong>
-                    ${escapeHtml(name)}
+                    ${escapeHtml(
+                        name
+                    )}
                 </strong>
 
-            </span>
+                <span>
+                    ${escapeHtml(
+                        email
+                    )}
+                </span>
 
-        `;
+                <small>
+                    <i class="fa-solid fa-circle-check"></i>
+                    Google Admin
+                </small>
 
-    }
+            </div>
 
-    else {
+        </div>
 
-        status.innerHTML = `
-
-            <span class="google-user-warning">
-
-                <i class="fa-solid fa-triangle-exclamation"></i>
-
-                Akun Google berhasil login,
-                tetapi bukan akun admin.
-
-            </span>
-
-        `;
-
-    }
+    `;
 
 }
 
 
 /* =========================================================
-   CLEAR GOOGLE UI
+   CLEAR GOOGLE ACCOUNT
 ========================================================= */
 
 function clearGoogleAccount() {
 
-    setGoogleStatus(
-        ""
-    );
+    const status =
+        $("googleLoginStatus");
+
+
+    if (
+        status
+    ) {
+
+        status.innerHTML =
+            "";
+
+    }
 
 }
 
@@ -770,9 +842,6 @@ function setGoogleStatus(
         !message
     ) {
 
-        element.innerHTML =
-            "";
-
         return;
 
     }
@@ -780,15 +849,29 @@ function setGoogleStatus(
 
     element.innerHTML = `
 
-        <span
-            class="${error ? "google-user-error" : ""}"
+        <div
+            class="google-status-message ${
+                error
+                    ? "error"
+                    : ""
+            }"
         >
+
+            ${
+                error
+                    ? `
+                        <i class="fa-solid fa-circle-xmark"></i>
+                      `
+                    : `
+                        <i class="fa-solid fa-circle-info"></i>
+                      `
+            }
 
             ${escapeHtml(
                 message
             )}
 
-        </span>
+        </div>
 
     `;
 
@@ -796,7 +879,7 @@ function setGoogleStatus(
 
 
 /* =========================================================
-   LOCAL AUTH LOAD
+   LOAD LOCAL AUTH
 ========================================================= */
 
 function loadLocalAuth() {
@@ -817,7 +900,6 @@ function loadLocalAuth() {
 
     }
 
-
     else {
 
         isAdminLoggedIn =
@@ -832,7 +914,7 @@ function loadLocalAuth() {
 
 
 /* =========================================================
-   AUTH UI
+   UPDATE AUTH UI
 ========================================================= */
 
 function updateAuthUI() {
@@ -868,7 +950,9 @@ function updateAuthUI() {
         ) {
 
             text.textContent =
-                "Logout Admin";
+                currentGoogleUser
+                    ? "Google Admin"
+                    : "Logout Admin";
 
         }
 
@@ -878,7 +962,9 @@ function updateAuthUI() {
         ) {
 
             icon.className =
-                "fa-solid fa-right-from-bracket";
+                currentGoogleUser
+                    ? "fa-brands fa-google"
+                    : "fa-solid fa-right-from-bracket";
 
         }
 
@@ -899,7 +985,9 @@ function updateAuthUI() {
         ) {
 
             button.title =
-                "Logout Admin";
+                currentGoogleUser
+                    ? "Google Admin - Logout"
+                    : "Logout Admin";
 
         }
 
@@ -953,10 +1041,15 @@ function updateAuthUI() {
 
 
 /* =========================================================
-   LOGIN MODAL
+   OPEN LOGIN MODAL
 ========================================================= */
 
 function openLoginModal() {
+
+    /*
+       Kalau sudah admin,
+       tombol berfungsi sebagai logout.
+    */
 
     if (
         isAdminLoggedIn
@@ -1011,6 +1104,10 @@ function openLoginModal() {
 }
 
 
+/* =========================================================
+   CLOSE LOGIN MODAL
+========================================================= */
+
 function closeLoginModal() {
 
     $("loginModal")
@@ -1057,13 +1154,49 @@ function handleLoginSubmit(
         ADMIN_PASSWORD
     ) {
 
+        /*
+           Jika sebelumnya ada akun Google,
+           logout Firebase dulu.
+        */
+
+        if (
+            currentGoogleUser
+        ) {
+
+            signOut(
+                auth
+            ).catch(
+                function (
+                    error
+                ) {
+
+                    console.warn(
+                        "Google logout:",
+                        error
+                    );
+
+                }
+            );
+
+        }
+
+
         isAdminLoggedIn =
             true;
+
+
+        currentGoogleUser =
+            null;
 
 
         localStorage.setItem(
             AUTH_KEY,
             "local-admin"
+        );
+
+
+        localStorage.removeItem(
+            GOOGLE_USER_KEY
         );
 
 
@@ -1118,22 +1251,45 @@ function handleLoginSubmit(
 
 
 /* =========================================================
-   LOGOUT
+   LOGOUT ADMIN
 ========================================================= */
 
 async function logoutAdmin() {
 
-    const usingGoogle =
-        Boolean(
-            currentGoogleUser
+    const authState =
+        localStorage.getItem(
+            AUTH_KEY
         );
 
 
+    /*
+       Logout Firebase
+       jika login berasal dari Google.
+    */
+
     if (
-        usingGoogle
+        authState ===
+        "google-admin"
     ) {
 
-        await logoutGoogle();
+        try {
+
+            await signOut(
+                auth
+            );
+
+        }
+
+        catch (
+            error
+        ) {
+
+            console.error(
+                "Firebase logout error:",
+                error
+            );
+
+        }
 
     }
 
@@ -1142,9 +1298,21 @@ async function logoutAdmin() {
         false;
 
 
+    currentGoogleUser =
+        null;
+
+
     localStorage.removeItem(
         AUTH_KEY
     );
+
+
+    localStorage.removeItem(
+        GOOGLE_USER_KEY
+    );
+
+
+    updateAuthUI();
 
 
     closeLoginModal();
@@ -1154,7 +1322,7 @@ async function logoutAdmin() {
     closeConfirmModal();
 
 
-    updateAuthUI();
+    clearGoogleAccount();
 
 
     addActivity(
@@ -1172,7 +1340,7 @@ async function logoutAdmin() {
 
 
 /* =========================================================
-   ADMIN CHECK
+   ADMIN SECURITY CHECK
 ========================================================= */
 
 function requireAdmin(
@@ -1204,10 +1372,14 @@ function requireAdmin(
 
 
 /* =========================================================
-   EVENTS
+   EVENT BINDING
 ========================================================= */
 
 function bindEvents() {
+
+    /* =====================================================
+       LOGIN
+    ===================================================== */
 
     $("loginButton")
         ?.addEventListener(
@@ -1271,7 +1443,9 @@ function bindEvents() {
         );
 
 
-    /* NAVIGATION */
+    /* =====================================================
+       NAVIGATION
+    ===================================================== */
 
     document
         .querySelectorAll(
@@ -1297,7 +1471,9 @@ function bindEvents() {
         );
 
 
-    /* MOBILE */
+    /* =====================================================
+       MOBILE MENU
+    ===================================================== */
 
     $("mobileMenuButton")
         ?.addEventListener(
@@ -1313,7 +1489,9 @@ function bindEvents() {
         );
 
 
-    /* THEME */
+    /* =====================================================
+       THEME
+    ===================================================== */
 
     $("themeButton")
         ?.addEventListener(
@@ -1329,7 +1507,9 @@ function bindEvents() {
         );
 
 
-    /* ADD */
+    /* =====================================================
+       ADD INVENTORY
+    ===================================================== */
 
     $("quickAddButton")
         ?.addEventListener(
@@ -1359,6 +1539,10 @@ function bindEvents() {
         );
 
 
+    /* =====================================================
+       MONITORING
+    ===================================================== */
+
     $("heroMonitorButton")
         ?.addEventListener(
             "click",
@@ -1372,7 +1556,9 @@ function bindEvents() {
         );
 
 
-    /* INVENTORY */
+    /* =====================================================
+       INVENTORY MODAL
+    ===================================================== */
 
     $("closeModalButton")
         ?.addEventListener(
@@ -1394,6 +1580,10 @@ function bindEvents() {
             handleFormSubmit
         );
 
+
+    /* =====================================================
+       SEARCH
+    ===================================================== */
 
     $("searchInput")
         ?.addEventListener(
@@ -1430,7 +1620,9 @@ function bindEvents() {
         );
 
 
-    /* CONFIRM */
+    /* =====================================================
+       CONFIRM
+    ===================================================== */
 
     $("confirmCancel")
         ?.addEventListener(
@@ -1464,7 +1656,9 @@ function bindEvents() {
         );
 
 
-    /* TOOLS */
+    /* =====================================================
+       EXPORT
+    ===================================================== */
 
     $("exportButton")
         ?.addEventListener(
@@ -1473,12 +1667,20 @@ function bindEvents() {
         );
 
 
+    /* =====================================================
+       BACKUP
+    ===================================================== */
+
     $("backupButton")
         ?.addEventListener(
             "click",
             createBackup
         );
 
+
+    /* =====================================================
+       RESTORE
+    ===================================================== */
 
     $("restoreButton")
         ?.addEventListener(
@@ -1499,6 +1701,10 @@ function bindEvents() {
         );
 
 
+    /* =====================================================
+       PRINT
+    ===================================================== */
+
     $("printButton")
         ?.addEventListener(
             "click",
@@ -1510,6 +1716,10 @@ function bindEvents() {
         );
 
 
+    /* =====================================================
+       ACTIVITY
+    ===================================================== */
+
     $("clearActivityButton")
         ?.addEventListener(
             "click",
@@ -1517,12 +1727,9 @@ function bindEvents() {
         );
 
 
-    $("installButton")
-        ?.addEventListener(
-            "click",
-            installPWA
-        );
-
+    /* =====================================================
+       PWA
+    ===================================================== */
 
     window.addEventListener(
         "beforeinstallprompt",
@@ -1546,7 +1753,16 @@ function bindEvents() {
     );
 
 
-    /* GPS */
+    $("installButton")
+        ?.addEventListener(
+            "click",
+            installPWA
+        );
+
+
+    /* =====================================================
+       GPS
+    ===================================================== */
 
     $("footerGpsButton")
         ?.addEventListener(
@@ -1555,7 +1771,9 @@ function bindEvents() {
         );
 
 
-    /* ESC */
+    /* =====================================================
+       KEYBOARD
+    ===================================================== */
 
     document.addEventListener(
         "keydown",
@@ -1576,9 +1794,31 @@ function bindEvents() {
 
             }
 
+
+            if (
+                (
+                    event.ctrlKey ||
+                    event.metaKey
+                ) &&
+                event.key.toLowerCase() ===
+                "k"
+            ) {
+
+                event.preventDefault();
+
+
+                $("searchInput")
+                    ?.focus();
+
+            }
+
         }
     );
 
+
+    /* =====================================================
+       INVENTORY OUTSIDE CLICK
+    ===================================================== */
 
     $("inventoryModal")
         ?.addEventListener(
@@ -1599,6 +1839,10 @@ function bindEvents() {
             }
         );
 
+
+    /* =====================================================
+       CONFIRM OUTSIDE CLICK
+    ===================================================== */
 
     $("confirmModal")
         ?.addEventListener(
@@ -1623,13 +1867,14 @@ function bindEvents() {
 
 
 /* =========================================================
-   PASSWORD
+   PASSWORD TOGGLE
 ========================================================= */
 
 function togglePassword() {
 
     const input =
         $("loginPassword");
+
 
     const button =
         $("togglePasswordButton");
@@ -1645,19 +1890,19 @@ function togglePassword() {
     }
 
 
-    const show =
+    const visible =
         input.type ===
         "password";
 
 
     input.type =
-        show
+        visible
             ? "text"
             : "password";
 
 
     button.innerHTML =
-        show
+        visible
             ? '<i class="fa-solid fa-eye-slash"></i>'
             : '<i class="fa-solid fa-eye"></i>';
 
@@ -1779,7 +2024,7 @@ function switchSection(
 
 
 /* =========================================================
-   DATA
+   LOAD DATA
 ========================================================= */
 
 function loadData() {
@@ -1846,6 +2091,7 @@ function loadData() {
     ) {
 
         console.error(
+            "Load data error:",
             error
         );
 
@@ -1856,6 +2102,10 @@ function loadData() {
 
 }
 
+
+/* =========================================================
+   NORMALIZE DATA
+========================================================= */
 
 function normalizeData(
     data
@@ -1958,6 +2208,10 @@ function normalizeData(
 }
 
 
+/* =========================================================
+   NORMALIZE CONDITION
+========================================================= */
+
 function normalizeCondition(
     value
 ) {
@@ -1997,20 +2251,44 @@ function normalizeCondition(
 }
 
 
+/* =========================================================
+   SAVE DATA
+========================================================= */
+
 function saveData() {
 
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(
-            inventoryData
-        )
-    );
+    try {
+
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(
+                inventoryData
+            )
+        );
+
+    }
+
+    catch (
+        error
+    ) {
+
+        console.error(
+            "Save data error:",
+            error
+        );
+
+        showToast(
+            "Data gagal disimpan.",
+            "error"
+        );
+
+    }
 
 }
 
 
 /* =========================================================
-   MODAL INVENTORY
+   ADD MODAL
 ========================================================= */
 
 function openAddModal() {
@@ -2039,6 +2317,11 @@ function openAddModal() {
         ?.reset();
 
 
+    $("inventoryId")
+        .value =
+        "";
+
+
     $("inventoryQuantity")
         .value =
         "1";
@@ -2059,8 +2342,23 @@ function openAddModal() {
         "modal-open"
     );
 
+
+    setTimeout(
+        function () {
+
+            $("inventoryCode")
+                ?.focus();
+
+        },
+        100
+    );
+
 }
 
+
+/* =========================================================
+   EDIT MODAL
+========================================================= */
 
 function openEditModal(
     id
@@ -2079,15 +2377,27 @@ function openEditModal(
 
     const item =
         inventoryData.find(
-            entry =>
-                entry.id ===
-                id
+            function (
+                entry
+            ) {
+
+                return (
+                    entry.id ===
+                    id
+                );
+
+            }
         );
 
 
     if (
         !item
     ) {
+
+        showToast(
+            "Data inventaris tidak ditemukan.",
+            "error"
+        );
 
         return;
 
@@ -2156,6 +2466,10 @@ function openEditModal(
 }
 
 
+/* =========================================================
+   CLOSE INVENTORY MODAL
+========================================================= */
+
 function closeInventoryModal() {
 
     $("inventoryModal")
@@ -2176,7 +2490,7 @@ function closeInventoryModal() {
 
 
 /* =========================================================
-   FORM
+   INVENTORY FORM
 ========================================================= */
 
 function handleFormSubmit(
@@ -2188,7 +2502,7 @@ function handleFormSubmit(
 
     if (
         !requireAdmin(
-            "menyimpan inventaris"
+            "menyimpan perubahan inventaris"
         )
     ) {
 
@@ -2199,44 +2513,50 @@ function handleFormSubmit(
 
     const code =
         $("inventoryCode")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
 
 
     const name =
         $("inventoryName")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
 
 
     const category =
         $("inventoryCategory")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
 
 
     const room =
         $("inventoryRoom")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
 
 
     const quantity =
         Number(
             $("inventoryQuantity")
-                .value
+                ?.value
         );
 
 
     const condition =
         $("inventoryCondition")
-            .value;
+            ?.value ||
+        "Baik";
 
 
     const notes =
         $("inventoryNotes")
-            .value
-            .trim();
+            ?.value
+            .trim() ||
+        "";
 
 
     if (
@@ -2247,7 +2567,7 @@ function handleFormSubmit(
     ) {
 
         showToast(
-            "Lengkapi data terlebih dahulu.",
+            "Lengkapi semua data terlebih dahulu.",
             "error"
         );
 
@@ -2276,14 +2596,24 @@ function handleFormSubmit(
 
     const duplicate =
         inventoryData.find(
-            item =>
+            function (
                 item
-                    .kodeInventaris
-                    .toLowerCase() ===
-                code
-                    .toLowerCase() &&
-                item.id !==
+            ) {
+
+                return (
+
+                    item.kodeInventaris
+                        .toLowerCase() ===
+                    code.toLowerCase()
+
+                    &&
+
+                    item.id !==
                     editingId
+
+                );
+
+            }
         );
 
 
@@ -2307,15 +2637,41 @@ function handleFormSubmit(
 
         const index =
             inventoryData.findIndex(
-                item =>
-                    item.id ===
-                    editingId
+                function (
+                    item
+                ) {
+
+                    return (
+                        item.id ===
+                        editingId
+                    );
+
+                }
             );
 
 
-        inventoryData[index] = {
+        if (
+            index ===
+            -1
+        ) {
 
-            ...inventoryData[index],
+            showToast(
+                "Data tidak ditemukan.",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        inventoryData[
+            index
+        ] = {
+
+            ...inventoryData[
+                index
+            ],
 
             kodeInventaris:
                 code,
@@ -2404,7 +2760,7 @@ function handleFormSubmit(
 
 
         showToast(
-            "Data berhasil ditambahkan.",
+            "Inventaris berhasil ditambahkan.",
             "success"
         );
 
@@ -2441,9 +2797,16 @@ function deleteInventory(
 
     const item =
         inventoryData.find(
-            entry =>
-                entry.id ===
-                id
+            function (
+                entry
+            ) {
+
+                return (
+                    entry.id ===
+                    id
+                );
+
+            }
         );
 
 
@@ -2451,9 +2814,17 @@ function deleteInventory(
         !item
     ) {
 
+        showToast(
+            "Data tidak ditemukan.",
+            "error"
+        );
+
         return;
 
     }
+
+
+    createAutoBackup();
 
 
     openConfirmModal(
@@ -2461,14 +2832,18 @@ function deleteInventory(
         `Yakin ingin menghapus "${item.nama}"?`,
         function () {
 
-            createAutoBackup();
-
-
             inventoryData =
                 inventoryData.filter(
-                    entry =>
-                        entry.id !==
-                        id
+                    function (
+                        entry
+                    ) {
+
+                        return (
+                            entry.id !==
+                            id
+                        );
+
+                    }
                 );
 
 
@@ -2496,7 +2871,7 @@ function deleteInventory(
 
 
 /* =========================================================
-   INVENTORY RENDER
+   RENDER INVENTORY
 ========================================================= */
 
 function renderInventory() {
@@ -2544,54 +2919,58 @@ function renderInventory() {
 
     let result =
         inventoryData.filter(
-            item => {
+            function (
+                item
+            ) {
 
-                const matchesSearch =
+                const searchMatch =
                     !search ||
-                    item
-                        .kodeInventaris
+
+                    item.kodeInventaris
                         .toLowerCase()
                         .includes(
                             search
                         ) ||
-                    item
-                        .nama
+
+                    item.nama
                         .toLowerCase()
                         .includes(
                             search
                         ) ||
-                    item
-                        .kategori
+
+                    item.kategori
                         .toLowerCase()
                         .includes(
                             search
                         ) ||
-                    item
-                        .ruangan
+
+                    item.ruangan
                         .toLowerCase()
                         .includes(
                             search
                         );
 
 
-                const matchesRoom =
+                const roomMatch =
                     room ===
                     "all" ||
+
                     item.ruangan ===
                     room;
 
 
-                const matchesCondition =
+                const conditionMatch =
                     condition ===
                     "all" ||
+
                     item.kondisi ===
                     condition;
 
 
                 return (
-                    matchesSearch &&
-                    matchesRoom &&
-                    matchesCondition
+                    searchMatch &&
+                    roomMatch &&
+                    conditionMatch
                 );
 
             }
@@ -2604,83 +2983,70 @@ function renderInventory() {
             b
         ) {
 
-            if (
-                sort ===
-                "oldest"
+            switch (
+                sort
             ) {
 
-                return (
-                    new Date(
-                        a.tanggal
-                    ) -
-                    new Date(
-                        b.tanggal
-                    )
-                );
+                case "oldest":
+
+                    return (
+                        new Date(
+                            a.tanggal
+                        ) -
+                        new Date(
+                            b.tanggal
+                        )
+                    );
+
+
+                case "nameAsc":
+
+                    return (
+                        a.nama.localeCompare(
+                            b.nama,
+                            "id"
+                        )
+                    );
+
+
+                case "nameDesc":
+
+                    return (
+                        b.nama.localeCompare(
+                            a.nama,
+                            "id"
+                        )
+                    );
+
+
+                case "stockHigh":
+
+                    return (
+                        b.jumlah -
+                        a.jumlah
+                    );
+
+
+                case "stockLow":
+
+                    return (
+                        a.jumlah -
+                        b.jumlah
+                    );
+
+
+                default:
+
+                    return (
+                        new Date(
+                            b.tanggal
+                        ) -
+                        new Date(
+                            a.tanggal
+                        )
+                    );
 
             }
-
-
-            if (
-                sort ===
-                "nameAsc"
-            ) {
-
-                return a.nama.localeCompare(
-                    b.nama,
-                    "id"
-                );
-
-            }
-
-
-            if (
-                sort ===
-                "nameDesc"
-            ) {
-
-                return b.nama.localeCompare(
-                    a.nama,
-                    "id"
-                );
-
-            }
-
-
-            if (
-                sort ===
-                "stockHigh"
-            ) {
-
-                return (
-                    b.jumlah -
-                    a.jumlah
-                );
-
-            }
-
-
-            if (
-                sort ===
-                "stockLow"
-            ) {
-
-                return (
-                    a.jumlah -
-                    b.jumlah
-                );
-
-            }
-
-
-            return (
-                new Date(
-                    b.tanggal
-                ) -
-                new Date(
-                    a.tanggal
-                )
-            );
 
         }
     );
@@ -2695,13 +3061,13 @@ function renderInventory() {
             item
         ) {
 
-            const tr =
+            const row =
                 document.createElement(
                     "tr"
                 );
 
 
-            tr.innerHTML = `
+            row.innerHTML = `
 
                 <td>
 
@@ -2785,10 +3151,13 @@ function renderInventory() {
                         <button
                             class="icon-button edit-button"
                             type="button"
-                            title="Edit"
+                            title="Edit inventaris"
+                            aria-label="Edit inventaris"
                         >
 
-                            <i class="fa-solid fa-pen"></i>
+                            <i
+                                class="fa-solid fa-pen"
+                            ></i>
 
                         </button>
 
@@ -2796,10 +3165,13 @@ function renderInventory() {
                         <button
                             class="icon-button delete delete-button"
                             type="button"
-                            title="Hapus"
+                            title="Hapus inventaris"
+                            aria-label="Hapus inventaris"
                         >
 
-                            <i class="fa-solid fa-trash"></i>
+                            <i
+                                class="fa-solid fa-trash"
+                            ></i>
 
                         </button>
 
@@ -2810,7 +3182,7 @@ function renderInventory() {
             `;
 
 
-            tr.querySelector(
+            row.querySelector(
                 ".edit-button"
             )?.addEventListener(
                 "click",
@@ -2824,7 +3196,7 @@ function renderInventory() {
             );
 
 
-            tr.querySelector(
+            row.querySelector(
                 ".delete-button"
             )?.addEventListener(
                 "click",
@@ -2839,22 +3211,36 @@ function renderInventory() {
 
 
             tbody.appendChild(
-                tr
+                row
             );
 
         }
     );
 
 
-    $("resultCount").textContent =
-        result.length;
+    if (
+        $("resultCount")
+    ) {
+
+        $("resultCount")
+            .textContent =
+            result.length;
+
+    }
 
 
-    $("emptyState")
-        ?.classList.toggle(
-            "hidden",
-            result.length !== 0
-        );
+    if (
+        $("emptyState")
+    ) {
+
+        $("emptyState")
+            .classList.toggle(
+                "hidden",
+                result.length !==
+                0
+            );
+
+    }
 
 }
 
@@ -2885,39 +3271,79 @@ function updateDashboard() {
         ).length;
 
 
-    const stock =
+    const totalStock =
         inventoryData.reduce(
-            (
-                total,
+            function (
+                sum,
                 item
-            ) =>
-                total +
-                Number(
-                    item.jumlah ||
-                    0
-                ),
+            ) {
+
+                return (
+                    sum +
+                    Number(
+                        item.jumlah ||
+                        0
+                    )
+                );
+
+            },
             0
         );
 
 
-    $("totalItems").textContent =
-        total;
+    if (
+        $("totalItems")
+    ) {
+
+        $("totalItems")
+            .textContent =
+            total;
+
+    }
 
 
-    $("goodItems").textContent =
-        good;
+    if (
+        $("goodItems")
+    ) {
+
+        $("goodItems")
+            .textContent =
+            good;
+
+    }
 
 
-    $("attentionItems").textContent =
-        attention;
+    if (
+        $("attentionItems")
+    ) {
+
+        $("attentionItems")
+            .textContent =
+            attention;
+
+    }
 
 
-    $("totalStock").textContent =
-        stock;
+    if (
+        $("totalStock")
+    ) {
+
+        $("totalStock")
+            .textContent =
+            totalStock;
+
+    }
 
 
-    $("terminalTotal").textContent =
-        total;
+    if (
+        $("terminalTotal")
+    ) {
+
+        $("terminalTotal")
+            .textContent =
+            total;
+
+    }
 
 
     updateHealth();
@@ -2939,12 +3365,26 @@ function updateHealth() {
         !inventoryData.length
     ) {
 
-        $("dataHealth").textContent =
-            "0%";
+        if (
+            $("dataHealth")
+        ) {
+
+            $("dataHealth")
+                .textContent =
+                "0%";
+
+        }
 
 
-        $("healthProgress").style.width =
-            "0%";
+        if (
+            $("healthProgress")
+        ) {
+
+            $("healthProgress")
+                .style.width =
+                "0%";
+
+        }
 
 
         return;
@@ -2954,15 +3394,27 @@ function updateHealth() {
 
     const complete =
         inventoryData.filter(
-            item =>
-                item.kodeInventaris &&
-                item.nama &&
-                item.kategori &&
-                item.ruangan
+            function (
+                item
+            ) {
+
+                return (
+
+                    item.kodeInventaris &&
+
+                    item.nama &&
+
+                    item.kategori &&
+
+                    item.ruangan
+
+                );
+
+            }
         ).length;
 
 
-    const percentage =
+    const percent =
         Math.round(
             complete /
             inventoryData.length *
@@ -2970,12 +3422,26 @@ function updateHealth() {
         );
 
 
-    $("dataHealth").textContent =
-        `${percentage}%`;
+    if (
+        $("dataHealth")
+    ) {
+
+        $("dataHealth")
+            .textContent =
+            `${percent}%`;
+
+    }
 
 
-    $("healthProgress").style.width =
-        `${percentage}%`;
+    if (
+        $("healthProgress")
+    ) {
+
+        $("healthProgress")
+            .style.width =
+            `${percent}%`;
+
+    }
 
 
     const good =
@@ -3002,22 +3468,43 @@ function updateHealth() {
         ).length;
 
 
-    $("healthGoodCount").textContent =
-        good;
+    if (
+        $("healthGoodCount")
+    ) {
+
+        $("healthGoodCount")
+            .textContent =
+            good;
+
+    }
 
 
-    $("healthLightCount").textContent =
-        light;
+    if (
+        $("healthLightCount")
+    ) {
+
+        $("healthLightCount")
+            .textContent =
+            light;
+
+    }
 
 
-    $("healthHeavyCount").textContent =
-        heavy;
+    if (
+        $("healthHeavyCount")
+    ) {
+
+        $("healthHeavyCount")
+            .textContent =
+            heavy;
+
+    }
 
 }
 
 
 /* =========================================================
-   RECENT
+   RECENT ITEMS
 ========================================================= */
 
 function renderRecent() {
@@ -3040,16 +3527,21 @@ function renderRecent() {
             ...inventoryData
         ]
         .sort(
-            (
+            function (
                 a,
                 b
-            ) =>
-                new Date(
-                    b.tanggal
-                ) -
-                new Date(
-                    a.tanggal
-                )
+            ) {
+
+                return (
+                    new Date(
+                        b.tanggal
+                    ) -
+                    new Date(
+                        a.tanggal
+                    )
+                );
+
+            }
         )
         .slice(
             0,
@@ -3075,46 +3567,59 @@ function renderRecent() {
     container.innerHTML =
         items
             .map(
-                item => `
+                function (
+                    item
+                ) {
 
-                    <div class="recent-item">
+                    return `
 
-                        <div class="recent-item-main">
+                        <div
+                            class="recent-item"
+                        >
 
-                            <strong>
+                            <div
+                                class="recent-item-main"
+                            >
 
-                                ${escapeHtml(
-                                    item.nama
+                                <strong>
+
+                                    ${escapeHtml(
+                                        item.nama
+                                    )}
+
+                                </strong>
+
+                                <span>
+
+                                    ${escapeHtml(
+                                        item.ruangan
+                                    )}
+
+                                    ·
+
+                                    ${item.jumlah}
+                                    unit
+
+                                </span>
+
+                            </div>
+
+
+                            <span
+                                class="recent-date"
+                            >
+
+                                ${formatDate(
+                                    item.tanggal
                                 )}
-
-                            </strong>
-
-                            <span>
-
-                                ${escapeHtml(
-                                    item.ruangan
-                                )}
-
-                                ·
-
-                                ${item.jumlah}
-                                unit
 
                             </span>
 
                         </div>
 
-                        <span class="recent-date">
+                    `;
 
-                            ${formatDate(
-                                item.tanggal
-                            )}
-
-                        </span>
-
-                    </div>
-
-                `
+                }
             )
             .join("");
 
@@ -3143,11 +3648,18 @@ function renderLowStock() {
     const items =
         inventoryData
             .filter(
-                item =>
-                    Number(
-                        item.jumlah
-                    ) <=
-                    2
+                function (
+                    item
+                ) {
+
+                    return (
+                        Number(
+                            item.jumlah
+                        ) <=
+                        2
+                    );
+
+                }
             )
             .slice(
                 0,
@@ -3173,39 +3685,52 @@ function renderLowStock() {
     container.innerHTML =
         items
             .map(
-                item => `
+                function (
+                    item
+                ) {
 
-                    <div class="mini-item">
+                    return `
 
-                        <div class="mini-item-main">
+                        <div
+                            class="mini-item"
+                        >
 
-                            <strong>
+                            <div
+                                class="mini-item-main"
+                            >
 
-                                ${escapeHtml(
-                                    item.nama
-                                )}
+                                <strong>
 
-                            </strong>
+                                    ${escapeHtml(
+                                        item.nama
+                                    )}
 
-                            <span>
+                                </strong>
 
-                                ${escapeHtml(
-                                    item.ruangan
-                                )}
+                                <span>
+
+                                    ${escapeHtml(
+                                        item.ruangan
+                                    )}
+
+                                </span>
+
+                            </div>
+
+
+                            <span
+                                class="mini-stock"
+                            >
+
+                                ${item.jumlah}
 
                             </span>
 
                         </div>
 
-                        <span class="mini-stock">
+                    `;
 
-                            ${item.jumlah}
-
-                        </span>
-
-                    </div>
-
-                `
+                }
             )
             .join("");
 
@@ -3239,20 +3764,28 @@ function updateRoomFilter() {
         [
             ...new Set(
                 inventoryData.map(
-                    item =>
-                        item.ruangan
+                    function (
+                        item
+                    ) {
+
+                        return item.ruangan;
+
+                    }
                 )
             )
         ]
         .sort(
-            (
+            function (
                 a,
                 b
-            ) =>
-                a.localeCompare(
+            ) {
+
+                return a.localeCompare(
                     b,
                     "id"
-                )
+                );
+
+            }
         );
 
 
@@ -3307,148 +3840,14 @@ function updateRoomFilter() {
 
 
 /* =========================================================
-   ROOM OVERVIEW
-========================================================= */
-
-function renderRooms() {
-
-    const container =
-        $("roomOverview");
-
-
-    if (
-        !container
-    ) {
-
-        return;
-
-    }
-
-
-    const roomData = {};
-
-
-    inventoryData.forEach(
-        item => {
-
-            roomData[
-                item.ruangan
-            ] =
-                (
-                    roomData[
-                        item.ruangan
-                    ] ||
-                    0
-                ) +
-                Number(
-                    item.jumlah ||
-                    0
-                );
-
-        }
-    );
-
-
-    const rooms =
-        Object.entries(
-            roomData
-        )
-        .sort(
-            (
-                a,
-                b
-            ) =>
-                b[1] -
-                a[1]
-        );
-
-
-    if (
-        !rooms.length
-    ) {
-
-        container.innerHTML = `
-            <div class="empty-mini">
-                Belum ada data ruangan.
-            </div>
-        `;
-
-        return;
-
-    }
-
-
-    const max =
-        Math.max(
-            ...rooms.map(
-                item =>
-                    item[1]
-            ),
-            1
-        );
-
-
-    container.innerHTML =
-        rooms
-            .slice(
-                0,
-                8
-            )
-            .map(
-                (
-                    [room, count]
-                ) => {
-
-                    const width =
-                        Math.round(
-                            count /
-                            max *
-                            100
-                        );
-
-
-                    return `
-
-                        <div class="room-row">
-
-                            <div class="room-name">
-
-                                ${escapeHtml(
-                                    room
-                                )}
-
-                            </div>
-
-                            <div class="room-bar">
-
-                                <div
-                                    style="width:${width}%"
-                                ></div>
-
-                            </div>
-
-                            <strong>
-
-                                ${count}
-
-                            </strong>
-
-                        </div>
-
-                    `;
-
-                }
-            )
-            .join("");
-
-}
-
-
-/* =========================================================
    MONITORING
 ========================================================= */
 
 function updateMonitoring() {
+
+    const total =
+        inventoryData.length;
+
 
     const good =
         inventoryData.filter(
@@ -3484,33 +3883,275 @@ function updateMonitoring() {
         ).length;
 
 
-    $("monitorTotal").textContent =
-        inventoryData.length;
+    if (
+        $("monitorTotal")
+    ) {
+
+        $("monitorTotal")
+            .textContent =
+            total;
+
+    }
 
 
-    $("monitorGood").textContent =
-        good;
+    if (
+        $("monitorGood")
+    ) {
+
+        $("monitorGood")
+            .textContent =
+            good;
+
+    }
 
 
-    $("monitorLowStock").textContent =
-        lowStock;
+    if (
+        $("monitorLowStock")
+    ) {
+
+        $("monitorLowStock")
+            .textContent =
+            lowStock;
+
+    }
 
 
-    $("monitorHealthGood").textContent =
-        good;
+    if (
+        $("healthGoodCount")
+    ) {
+
+        $("healthGoodCount")
+            .textContent =
+            good;
+
+    }
 
 
-    $("monitorHealthLight").textContent =
-        light;
+    if (
+        $("healthLightCount")
+    ) {
+
+        $("healthLightCount")
+            .textContent =
+            light;
+
+    }
 
 
-    $("monitorHealthHeavy").textContent =
-        heavy;
+    if (
+        $("healthHeavyCount")
+    ) {
 
+        $("healthHeavyCount")
+            .textContent =
+            heavy;
+
+    }
+
+
+    if (
+        $("monitorHealthGood")
+    ) {
+
+        $("monitorHealthGood")
+            .textContent =
+            good;
+
+    }
+
+
+    if (
+        $("monitorHealthLight")
+    ) {
+
+        $("monitorHealthLight")
+            .textContent =
+            light;
+
+    }
+
+
+    if (
+        $("monitorHealthHeavy")
+    ) {
+
+        $("monitorHealthHeavy")
+            .textContent =
+            heavy;
+
+    }
+
+
+    renderRooms();
 
     updateStorage();
 
-    renderRooms();
+}
+
+
+/* =========================================================
+   ROOM OVERVIEW
+========================================================= */
+
+function renderRooms() {
+
+    const container =
+        $("roomOverview");
+
+
+    if (
+        !container
+    ) {
+
+        return;
+
+    }
+
+
+    const roomData = {};
+
+
+    inventoryData.forEach(
+        function (
+            item
+        ) {
+
+            roomData[
+                item.ruangan
+            ] =
+
+                (
+                    roomData[
+                        item.ruangan
+                    ] ||
+                    0
+                )
+
+                +
+
+                Number(
+                    item.jumlah ||
+                    0
+                );
+
+        }
+    );
+
+
+    const rooms =
+        Object.entries(
+            roomData
+        )
+        .sort(
+            function (
+                a,
+                b
+            ) {
+
+                return (
+                    b[1] -
+                    a[1]
+                );
+
+            }
+        );
+
+
+    if (
+        !rooms.length
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-mini">
+                Belum ada data ruangan.
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    const max =
+        Math.max(
+            ...rooms.map(
+                function (
+                    item
+                ) {
+
+                    return item[1];
+
+                }
+            ),
+            1
+        );
+
+
+    container.innerHTML =
+        rooms
+            .slice(
+                0,
+                8
+            )
+            .map(
+                function (
+                    roomDataEntry
+                ) {
+
+                    const room =
+                        roomDataEntry[0];
+
+                    const count =
+                        roomDataEntry[1];
+
+
+                    const width =
+                        Math.round(
+                            count /
+                            max *
+                            100
+                        );
+
+
+                    return `
+
+                        <div
+                            class="room-row"
+                        >
+
+                            <div
+                                class="room-name"
+                            >
+
+                                ${escapeHtml(
+                                    room
+                                )}
+
+                            </div>
+
+                            <div
+                                class="room-bar"
+                            >
+
+                                <div
+                                    style="width:${width}%"
+                                ></div>
+
+                            </div>
+
+                            <strong>
+
+                                ${count}
+
+                            </strong>
+
+                        </div>
+
+                    `;
+
+                }
+            )
+            .join("");
 
 }
 
@@ -3527,25 +4168,46 @@ function renderStatistics() {
 
     const good =
         inventoryData.filter(
-            item =>
-                item.kondisi ===
-                "Baik"
+            function (
+                item
+            ) {
+
+                return (
+                    item.kondisi ===
+                    "Baik"
+                );
+
+            }
         ).length;
 
 
     const light =
         inventoryData.filter(
-            item =>
-                item.kondisi ===
-                "Ringan"
+            function (
+                item
+            ) {
+
+                return (
+                    item.kondisi ===
+                    "Ringan"
+                );
+
+            }
         ).length;
 
 
     const heavy =
         inventoryData.filter(
-            item =>
-                item.kondisi ===
-                "Berat"
+            function (
+                item
+            ) {
+
+                return (
+                    item.kondisi ===
+                    "Berat"
+                );
+
+            }
         ).length;
 
 
@@ -3579,20 +4241,48 @@ function renderStatistics() {
             : 0;
 
 
-    $("donutTotal").textContent =
-        total;
+    if (
+        $("donutTotal")
+    ) {
+
+        $("donutTotal")
+            .textContent =
+            total;
+
+    }
 
 
-    $("legendGood").textContent =
-        `${goodPercent}%`;
+    if (
+        $("legendGood")
+    ) {
+
+        $("legendGood")
+            .textContent =
+            `${goodPercent}%`;
+
+    }
 
 
-    $("legendLight").textContent =
-        `${lightPercent}%`;
+    if (
+        $("legendLight")
+    ) {
+
+        $("legendLight")
+            .textContent =
+            `${lightPercent}%`;
+
+    }
 
 
-    $("legendHeavy").textContent =
-        `${heavyPercent}%`;
+    if (
+        $("legendHeavy")
+    ) {
+
+        $("legendHeavy")
+            .textContent =
+            `${heavyPercent}%`;
+
+    }
 
 
     const endGood =
@@ -3604,10 +4294,15 @@ function renderStatistics() {
         lightPercent;
 
 
-    $("conditionDonut")
-        .style.background =
-        `
-            conic-gradient(
+    if (
+        $("conditionDonut")
+    ) {
+
+        $("conditionDonut")
+            .style.background =
+
+            `conic-gradient(
+
                 var(--green)
                 0% ${endGood}%,
 
@@ -3616,8 +4311,10 @@ function renderStatistics() {
 
                 var(--red)
                 ${endLight}% 100%
-            )
-        `;
+
+            )`;
+
+    }
 
 
     renderCategories();
@@ -3635,21 +4332,36 @@ function renderCategories() {
         $("categoryStats");
 
 
+    if (
+        !container
+    ) {
+
+        return;
+
+    }
+
+
     const categories = {};
 
 
     inventoryData.forEach(
-        item => {
+        function (
+            item
+        ) {
 
             categories[
                 item.kategori
             ] =
+
                 (
                     categories[
                         item.kategori
                     ] ||
                     0
-                ) +
+                )
+
+                +
+
                 Number(
                     item.jumlah ||
                     0
@@ -3664,12 +4376,21 @@ function renderCategories() {
             categories
         )
         .sort(
-            (
+            function (
                 a,
                 b
-            ) =>
-                b[1] -
-                a[1]
+            ) {
+
+                return (
+                    b[1] -
+                    a[1]
+                );
+
+            }
+        )
+        .slice(
+            0,
+            8
         );
 
 
@@ -3691,8 +4412,13 @@ function renderCategories() {
     const max =
         Math.max(
             ...list.map(
-                item =>
-                    item[1]
+                function (
+                    entry
+                ) {
+
+                    return entry[1];
+
+                }
             ),
             1
         );
@@ -3700,14 +4426,17 @@ function renderCategories() {
 
     container.innerHTML =
         list
-            .slice(
-                0,
-                8
-            )
             .map(
-                (
-                    [name, count]
-                ) => {
+                function (
+                    entry
+                ) {
+
+                    const name =
+                        entry[0];
+
+                    const count =
+                        entry[1];
+
 
                     const width =
                         Math.round(
@@ -3719,9 +4448,13 @@ function renderCategories() {
 
                     return `
 
-                        <div class="category-item">
+                        <div
+                            class="category-item"
+                        >
 
-                            <div class="category-name">
+                            <div
+                                class="category-name"
+                            >
 
                                 ${escapeHtml(
                                     name
@@ -3729,13 +4462,17 @@ function renderCategories() {
 
                             </div>
 
-                            <div class="category-bar">
+
+                            <div
+                                class="category-bar"
+                            >
 
                                 <div
                                     style="width:${width}%"
                                 ></div>
 
                             </div>
+
 
                             <strong>
 
@@ -3755,7 +4492,7 @@ function renderCategories() {
 
 
 /* =========================================================
-   ACTIVITY
+   ACTIVITY LOAD
 ========================================================= */
 
 function loadActivity() {
@@ -3793,6 +4530,11 @@ function loadActivity() {
         error
     ) {
 
+        console.warn(
+            "Activity loading error:",
+            error
+        );
+
         activityData =
             [];
 
@@ -3801,20 +4543,43 @@ function loadActivity() {
 }
 
 
+/* =========================================================
+   ACTIVITY SAVE
+========================================================= */
+
 function saveActivity() {
 
-    localStorage.setItem(
-        ACTIVITY_KEY,
-        JSON.stringify(
-            activityData.slice(
-                0,
-                50
+    try {
+
+        localStorage.setItem(
+            ACTIVITY_KEY,
+            JSON.stringify(
+                activityData.slice(
+                    0,
+                    50
+                )
             )
-        )
-    );
+        );
+
+    }
+
+    catch (
+        error
+    ) {
+
+        console.error(
+            "Activity save error:",
+            error
+        );
+
+    }
 
 }
 
+
+/* =========================================================
+   ADD ACTIVITY
+========================================================= */
 
 function addActivity(
     text,
@@ -3854,6 +4619,10 @@ function addActivity(
 }
 
 
+/* =========================================================
+   RENDER ACTIVITY
+========================================================= */
+
 function renderActivity() {
 
     const container =
@@ -3891,49 +4660,63 @@ function renderActivity() {
                 20
             )
             .map(
-                item => `
+                function (
+                    item
+                ) {
 
-                    <div class="activity-item">
+                    return `
 
-                        <div class="activity-icon">
+                        <div
+                            class="activity-item"
+                        >
 
-                            <i
-                                class="fa-solid ${escapeHtml(
-                                    item.icon
-                                )}"
-                            ></i>
+                            <div
+                                class="activity-icon"
+                            >
 
-                        </div>
+                                <i
+                                    class="fa-solid ${escapeHtml(
+                                        item.icon
+                                    )}"
+                                ></i>
+
+                            </div>
 
 
-                        <div class="activity-text">
+                            <div
+                                class="activity-text"
+                            >
 
-                            <strong>
+                                <strong>
 
-                                ${escapeHtml(
-                                    item.text
+                                    ${escapeHtml(
+                                        item.text
+                                    )}
+
+                                </strong>
+
+                                <span>
+                                    Sistem Inventaris
+                                </span>
+
+                            </div>
+
+
+                            <div
+                                class="activity-time"
+                            >
+
+                                ${formatTime(
+                                    item.time
                                 )}
 
-                            </strong>
-
-                            <span>
-                                Sistem Inventaris
-                            </span>
+                            </div>
 
                         </div>
 
+                    `;
 
-                        <div class="activity-time">
-
-                            ${formatTime(
-                                item.time
-                            )}
-
-                        </div>
-
-                    </div>
-
-                `
+                }
             )
             .join("");
 
@@ -3941,7 +4724,7 @@ function renderActivity() {
 
 
 /* =========================================================
-   STORAGE
+   STORAGE MONITOR
 ========================================================= */
 
 function updateStorage() {
@@ -3978,12 +4761,26 @@ function updateStorage() {
             );
 
 
-        $("monitorStorage").textContent =
-            `${percent}%`;
+        if (
+            $("monitorStorage")
+        ) {
+
+            $("monitorStorage")
+                .textContent =
+                `${percent}%`;
+
+        }
 
 
-        $("terminalStorage").textContent =
-            `${percent}%`;
+        if (
+            $("terminalStorage")
+        ) {
+
+            $("terminalStorage")
+                .textContent =
+                `${percent}%`;
+
+        }
 
     }
 
@@ -3991,11 +4788,70 @@ function updateStorage() {
         error
     ) {
 
-        $("monitorStorage").textContent =
-            "0%";
+        if (
+            $("monitorStorage")
+        ) {
 
-        $("terminalStorage").textContent =
-            "0%";
+            $("monitorStorage")
+                .textContent =
+                "0%";
+
+        }
+
+
+        if (
+            $("terminalStorage")
+        ) {
+
+            $("terminalStorage")
+                .textContent =
+                "0%";
+
+        }
+
+    }
+
+}
+
+
+/* =========================================================
+   AUTO BACKUP
+========================================================= */
+
+function createAutoBackup() {
+
+    try {
+
+        localStorage.setItem(
+            AUTO_BACKUP_KEY,
+            JSON.stringify({
+
+                version:
+                    "5.4",
+
+                createdAt:
+                    new Date()
+                        .toISOString(),
+
+                inventory:
+                    inventoryData,
+
+                activities:
+                    activityData
+
+            })
+        );
+
+    }
+
+    catch (
+        error
+    ) {
+
+        console.error(
+            "Auto backup error:",
+            error
+        );
 
     }
 
@@ -4006,31 +4862,6 @@ function updateStorage() {
    BACKUP
 ========================================================= */
 
-function createAutoBackup() {
-
-    localStorage.setItem(
-        AUTO_BACKUP_KEY,
-        JSON.stringify({
-
-            version:
-                "5.4",
-
-            createdAt:
-                new Date()
-                    .toISOString(),
-
-            inventory:
-                inventoryData,
-
-            activities:
-                activityData
-
-        })
-    );
-
-}
-
-
 function createBackup() {
 
     if (
@@ -4038,16 +4869,13 @@ function createBackup() {
     ) {
 
         showToast(
-            "Belum ada data.",
+            "Belum ada data untuk backup.",
             "info"
         );
 
         return;
 
     }
-
-
-    createAutoBackup();
 
 
     const backup = {
@@ -4066,6 +4894,9 @@ function createBackup() {
             activityData
 
     };
+
+
+    createAutoBackup();
 
 
     downloadFile(
@@ -4117,98 +4948,107 @@ function handleRestore(
     readJSON(
         file
     )
-    .then(
-        function (
-            data
-        ) {
-
-            if (
-                !data ||
-                !Array.isArray(
-                    data.inventory
-                )
+        .then(
+            function (
+                data
             ) {
 
-                throw new Error(
-                    "Invalid backup"
-                );
+                if (
+                    !data ||
+                    !Array.isArray(
+                        data.inventory
+                    )
+                ) {
 
-            }
-
-
-            openConfirmModal(
-                "Restore Backup",
-                "Data saat ini akan diganti dengan isi backup.",
-                function () {
-
-                    createAutoBackup();
-
-
-                    inventoryData =
-                        normalizeData(
-                            data.inventory
-                        );
-
-
-                    if (
-                        Array.isArray(
-                            data.activities
-                        )
-                    ) {
-
-                        activityData =
-                            data.activities;
-
-                        saveActivity();
-
-                    }
-
-
-                    saveData();
-
-                    renderAll();
-
-
-                    addActivity(
-                        "Memulihkan backup",
-                        "fa-clock-rotate-left"
-                    );
-
-
-                    showToast(
-                        "Backup berhasil dipulihkan.",
-                        "success"
+                    throw new Error(
+                        "Backup tidak valid."
                     );
 
                 }
-            );
 
-        }
-    )
-    .catch(
-        function () {
 
-            showToast(
-                "File backup tidak valid.",
-                "error"
-            );
+                openConfirmModal(
+                    "Restore Backup",
+                    "Data saat ini akan diganti dengan isi backup.",
+                    function () {
 
-        }
-    )
-    .finally(
-        function () {
+                        createAutoBackup();
 
-            event.target.value =
-                "";
 
-        }
-    );
+                        inventoryData =
+                            normalizeData(
+                                data.inventory
+                            );
+
+
+                        if (
+                            Array.isArray(
+                                data.activities
+                            )
+                        ) {
+
+                            activityData =
+                                data.activities;
+
+                            saveActivity();
+
+                        }
+
+
+                        saveData();
+
+
+                        renderAll();
+
+
+                        addActivity(
+                            "Memulihkan backup",
+                            "fa-clock-rotate-left"
+                        );
+
+
+                        showToast(
+                            "Backup berhasil dipulihkan.",
+                            "success"
+                        );
+
+                    }
+                );
+
+            }
+        )
+        .catch(
+            function (
+                error
+            ) {
+
+                console.error(
+                    "Restore error:",
+                    error
+                );
+
+
+                showToast(
+                    "File backup tidak valid.",
+                    "error"
+                );
+
+            }
+        )
+        .finally(
+            function () {
+
+                event.target.value =
+                    "";
+
+            }
+        );
 
 }
 
 
 /* =========================================================
-   CSV
+   EXPORT CSV
 ========================================================= */
 
 function exportCSV() {
@@ -4250,29 +5090,35 @@ function exportCSV() {
 
     const rows =
         inventoryData.map(
-            item => [
+            function (
+                item
+            ) {
 
-                item.kodeInventaris,
+                return [
 
-                item.nama,
+                    item.kodeInventaris,
 
-                item.kategori,
+                    item.nama,
 
-                item.ruangan,
+                    item.kategori,
 
-                item.jumlah,
+                    item.ruangan,
 
-                conditionLabel(
-                    item.kondisi
-                ),
+                    item.jumlah,
 
-                item.keterangan,
+                    conditionLabel(
+                        item.kondisi
+                    ),
 
-                formatDate(
-                    item.tanggal
-                )
+                    item.keterangan,
 
-            ]
+                    formatDate(
+                        item.tanggal
+                    )
+
+                ];
+
+            }
         );
 
 
@@ -4281,15 +5127,20 @@ function exportCSV() {
             headers,
             ...rows
         ]
-        .map(
-            row =>
-                row
-                    .map(
-                        csvEscape
-                    )
-                    .join(",")
-        )
-        .join("\n");
+            .map(
+                function (
+                    row
+                ) {
+
+                    return row
+                        .map(
+                            csvEscape
+                        )
+                        .join(",");
+
+                }
+            )
+            .join("\n");
 
 
     downloadFile(
@@ -4307,7 +5158,7 @@ function exportCSV() {
 
 
     showToast(
-        "CSV berhasil dibuat.",
+        "Data berhasil diexport.",
         "success"
     );
 
@@ -4315,22 +5166,53 @@ function exportCSV() {
 
 
 /* =========================================================
-   FILTER
+   RESET FILTER
 ========================================================= */
 
 function resetFilters() {
 
-    $("searchInput").value =
-        "";
+    if (
+        $("searchInput")
+    ) {
 
-    $("roomFilter").value =
-        "all";
+        $("searchInput")
+            .value =
+            "";
 
-    $("conditionFilter").value =
-        "all";
+    }
 
-    $("sortFilter").value =
-        "newest";
+
+    if (
+        $("roomFilter")
+    ) {
+
+        $("roomFilter")
+            .value =
+            "all";
+
+    }
+
+
+    if (
+        $("conditionFilter")
+    ) {
+
+        $("conditionFilter")
+            .value =
+            "all";
+
+    }
+
+
+    if (
+        $("sortFilter")
+    ) {
+
+        $("sortFilter")
+            .value =
+            "newest";
+
+    }
 
 
     renderInventory();
@@ -4339,7 +5221,7 @@ function resetFilters() {
 
 
 /* =========================================================
-   CONFIRM
+   CONFIRM MODAL
 ========================================================= */
 
 function openConfirmModal(
@@ -4348,14 +5230,26 @@ function openConfirmModal(
     callback
 ) {
 
-    $("confirmTitle")
-        .textContent =
-        title;
+    if (
+        $("confirmTitle")
+    ) {
+
+        $("confirmTitle")
+            .textContent =
+            title;
+
+    }
 
 
-    $("confirmMessage")
-        .textContent =
-        message;
+    if (
+        $("confirmMessage")
+    ) {
+
+        $("confirmMessage")
+            .textContent =
+            message;
+
+    }
 
 
     confirmCallback =
@@ -4463,13 +5357,17 @@ function updateThemeUI(
 
                     <span>
 
-                        <i class="fa-solid fa-sun"></i>
+                        <i
+                            class="fa-solid fa-sun"
+                        ></i>
 
                         Light Mode
 
                     </span>
 
-                    <i class="fa-solid fa-toggle-on"></i>
+                    <i
+                        class="fa-solid fa-toggle-on"
+                    ></i>
 
                 `
 
@@ -4477,13 +5375,17 @@ function updateThemeUI(
 
                     <span>
 
-                        <i class="fa-solid fa-moon"></i>
+                        <i
+                            class="fa-solid fa-moon"
+                        ></i>
 
                         Dark Mode
 
                     </span>
 
-                    <i class="fa-solid fa-toggle-off"></i>
+                    <i
+                        class="fa-solid fa-toggle-off"
+                    ></i>
 
                 `;
 
@@ -4499,9 +5401,17 @@ function updateThemeUI(
 
             dark
 
-                ? `<i class="fa-solid fa-sun"></i>`
+                ? `
+                    <i
+                        class="fa-solid fa-sun"
+                    ></i>
+                  `
 
-                : `<i class="fa-solid fa-moon"></i>`;
+                : `
+                    <i
+                        class="fa-solid fa-moon"
+                    ></i>
+                  `;
 
     }
 
@@ -4540,16 +5450,16 @@ function openGPS() {
             position
         ) {
 
-            const lat =
+            const latitude =
                 position.coords.latitude;
 
 
-            const lon =
+            const longitude =
                 position.coords.longitude;
 
 
             const url =
-                `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+                `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 
 
             addActivity(
@@ -4572,6 +5482,7 @@ function openGPS() {
 
         },
 
+
         function (
             error
         ) {
@@ -4591,7 +5502,7 @@ function openGPS() {
             }
 
 
-            if (
+            else if (
                 error.code ===
                 2
             ) {
@@ -4602,7 +5513,7 @@ function openGPS() {
             }
 
 
-            if (
+            else if (
                 error.code ===
                 3
             ) {
@@ -4619,6 +5530,7 @@ function openGPS() {
             );
 
         },
+
 
         {
 
@@ -4639,7 +5551,7 @@ function openGPS() {
 
 
 /* =========================================================
-   PWA
+   PWA INSTALL
 ========================================================= */
 
 async function installPWA() {
@@ -4649,7 +5561,7 @@ async function installPWA() {
     ) {
 
         showToast(
-            "Install App belum tersedia.",
+            "Install App belum tersedia pada browser ini.",
             "info"
         );
 
@@ -4672,6 +5584,7 @@ async function installPWA() {
     ) {
 
         console.warn(
+            "Install prompt error:",
             error
         );
 
@@ -4690,12 +5603,16 @@ async function installPWA() {
 }
 
 
+/* =========================================================
+   SERVICE WORKER
+========================================================= */
+
 async function registerServiceWorker() {
 
     if (
         !(
-            "serviceWorker"
-            in navigator
+            "serviceWorker" in
+            navigator
         )
     ) {
 
@@ -4720,7 +5637,8 @@ async function registerServiceWorker() {
             "service-worker.js"
         );
 
-        console.log(
+
+        console.info(
             "Service Worker aktif."
         );
 
@@ -4731,7 +5649,7 @@ async function registerServiceWorker() {
     ) {
 
         console.warn(
-            "Service Worker:",
+            "Service Worker error:",
             error
         );
 
@@ -4741,7 +5659,7 @@ async function registerServiceWorker() {
 
 
 /* =========================================================
-   ACTIVITY CLEAR
+   CLEAR ACTIVITY
 ========================================================= */
 
 function clearActivities() {
@@ -4762,7 +5680,7 @@ function clearActivities() {
 
     openConfirmModal(
         "Bersihkan Aktivitas",
-        "Semua log aktivitas akan dihapus.",
+        "Semua aktivitas akan dihapus.",
         function () {
 
             activityData =
@@ -4775,7 +5693,7 @@ function clearActivities() {
 
 
             showToast(
-                "Aktivitas dibersihkan.",
+                "Aktivitas berhasil dibersihkan.",
                 "success"
             );
 
@@ -4786,7 +5704,7 @@ function clearActivities() {
 
 
 /* =========================================================
-   FOOTER
+   FOOTER YEAR
 ========================================================= */
 
 function updateFooterYear() {
@@ -4796,15 +5714,20 @@ function updateFooterYear() {
             .getFullYear();
 
 
-    if (
-        $("footerYear")
-    ) {
+    document
+        .querySelectorAll(
+            "#footerYear"
+        )
+        .forEach(
+            function (
+                element
+            ) {
 
-        $("footerYear")
-            .textContent =
-            year;
+                element.textContent =
+                    year;
 
-    }
+            }
+        );
 
 }
 
@@ -4835,7 +5758,7 @@ function renderAll() {
 
 
 /* =========================================================
-   SPLASH
+   SPLASH SCREEN
 ========================================================= */
 
 function hideSplash() {
@@ -4883,7 +5806,7 @@ function hideSplash() {
 
 
 /* =========================================================
-   UTILITIES
+   CREATE ID
 ========================================================= */
 
 function createId() {
@@ -4899,22 +5822,31 @@ function createId() {
 
 
     return (
+
         Date.now()
-            .toString(36) +
+            .toString(36)
+
+        +
+
         Math.random()
             .toString(36)
             .slice(2)
+
     );
 
 }
 
 
+/* =========================================================
+   CONDITION LABEL
+========================================================= */
+
 function conditionLabel(
-    value
+    condition
 ) {
 
     if (
-        value ===
+        condition ===
         "Ringan"
     ) {
 
@@ -4924,7 +5856,7 @@ function conditionLabel(
 
 
     if (
-        value ===
+        condition ===
         "Berat"
     ) {
 
@@ -4937,6 +5869,10 @@ function conditionLabel(
 
 }
 
+
+/* =========================================================
+   FORMAT DATE
+========================================================= */
 
 function formatDate(
     value
@@ -4978,6 +5914,10 @@ function formatDate(
 }
 
 
+/* =========================================================
+   FORMAT TIME
+========================================================= */
+
 function formatTime(
     value
 ) {
@@ -4986,6 +5926,17 @@ function formatTime(
         new Date(
             value
         );
+
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+
+        return "-";
+
+    }
 
 
     return date.toLocaleTimeString(
@@ -5003,6 +5954,10 @@ function formatTime(
 
 }
 
+
+/* =========================================================
+   LIVE CLOCK
+========================================================= */
 
 function updateClock() {
 
@@ -5065,34 +6020,44 @@ function updateClock() {
 }
 
 
+/* =========================================================
+   FILE DATE
+========================================================= */
+
 function fileDate() {
 
-    const now =
+    const date =
         new Date();
 
 
     return [
 
-        now.getFullYear(),
+        date.getFullYear(),
 
         String(
-            now.getMonth() + 1
-        ).padStart(
-            2,
-            "0"
-        ),
-
-        String(
-            now.getDate()
-        ).padStart(
-            2,
-            "0"
+            date.getMonth() + 1
         )
+            .padStart(
+                2,
+                "0"
+            ),
+
+        String(
+            date.getDate()
+        )
+            .padStart(
+                2,
+                "0"
+            )
 
     ].join("-");
 
 }
 
+
+/* =========================================================
+   CSV ESCAPE
+========================================================= */
 
 function csvEscape(
     value
@@ -5112,12 +6077,16 @@ function csvEscape(
     ) {
 
         return (
+
             '"' +
+
             text.replace(
                 /"/g,
                 '""'
             ) +
+
             '"'
+
         );
 
     }
@@ -5127,6 +6096,10 @@ function csvEscape(
 
 }
 
+
+/* =========================================================
+   DOWNLOAD FILE
+========================================================= */
 
 function downloadFile(
     content,
@@ -5140,7 +6113,8 @@ function downloadFile(
                 content
             ],
             {
-                type
+                type:
+                    type
             }
         );
 
@@ -5151,29 +6125,33 @@ function downloadFile(
         );
 
 
-    const a =
+    const link =
         document.createElement(
             "a"
         );
 
 
-    a.href =
+    link.href =
         url;
 
 
-    a.download =
+    link.download =
         filename;
 
 
+    link.style.display =
+        "none";
+
+
     document.body.appendChild(
-        a
+        link
     );
 
 
-    a.click();
+    link.click();
 
 
-    a.remove();
+    link.remove();
 
 
     setTimeout(
@@ -5189,6 +6167,10 @@ function downloadFile(
 
 }
 
+
+/* =========================================================
+   READ JSON
+========================================================= */
 
 function readJSON(
     file
@@ -5249,6 +6231,10 @@ function readJSON(
 
 }
 
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
 
 function escapeHtml(
     value
@@ -5332,7 +6318,7 @@ function showToast(
     }
 
 
-    if (
+    else if (
         type ===
         "error"
     ) {
@@ -5342,6 +6328,20 @@ function showToast(
 
         title =
             "Error";
+
+    }
+
+
+    else if (
+        type ===
+        "warning"
+    ) {
+
+        icon =
+            "fa-triangle-exclamation";
+
+        title =
+            "Peringatan";
 
     }
 
@@ -5365,13 +6365,17 @@ function showToast(
         <div>
 
             <strong>
+
                 ${title}
+
             </strong>
 
             <span>
+
                 ${escapeHtml(
                     message
                 )}
+
             </span>
 
         </div>
@@ -5417,3 +6421,35 @@ function showToast(
     );
 
 }
+
+
+/* =========================================================
+   DEBUG HELPER
+========================================================= */
+
+window.inventoryApp = {
+
+    auth,
+
+    loginWithGoogle,
+
+    logoutGoogle,
+
+    getCurrentUser:
+        function () {
+
+            return (
+                auth.currentUser ||
+                null
+            );
+
+    },
+
+    isAdmin:
+        function () {
+
+            return isAdminLoggedIn;
+
+    }
+
+};
