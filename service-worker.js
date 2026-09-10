@@ -1,5 +1,6 @@
 const CACHE_NAME =
-    "room-inventory-v5-4";
+    "sistem-inventaris-v5-4";
+
 
 const APP_FILES = [
 
@@ -16,13 +17,11 @@ const APP_FILES = [
 ];
 
 
-/* =========================================================
-   INSTALL
-========================================================= */
-
 self.addEventListener(
     "install",
-    function (event) {
+    function (
+        event
+    ) {
 
         event.waitUntil(
 
@@ -30,9 +29,10 @@ self.addEventListener(
                 .open(
                     CACHE_NAME
                 )
-
                 .then(
-                    function (cache) {
+                    function (
+                        cache
+                    ) {
 
                         return cache.addAll(
                             APP_FILES
@@ -40,7 +40,6 @@ self.addEventListener(
 
                     }
                 )
-
                 .then(
                     function () {
 
@@ -55,28 +54,28 @@ self.addEventListener(
 );
 
 
-/* =========================================================
-   ACTIVATE
-========================================================= */
-
 self.addEventListener(
     "activate",
-    function (event) {
+    function (
+        event
+    ) {
 
         event.waitUntil(
 
             caches
                 .keys()
-
                 .then(
-                    function (keys) {
+                    function (
+                        keys
+                    ) {
 
                         return Promise.all(
 
                             keys
-
                                 .filter(
-                                    function (key) {
+                                    function (
+                                        key
+                                    ) {
 
                                         return (
                                             key !==
@@ -85,9 +84,10 @@ self.addEventListener(
 
                                     }
                                 )
-
                                 .map(
-                                    function (key) {
+                                    function (
+                                        key
+                                    ) {
 
                                         return caches.delete(
                                             key
@@ -100,7 +100,6 @@ self.addEventListener(
 
                     }
                 )
-
                 .then(
                     function () {
 
@@ -115,13 +114,11 @@ self.addEventListener(
 );
 
 
-/* =========================================================
-   FETCH
-========================================================= */
-
 self.addEventListener(
     "fetch",
-    function (event) {
+    function (
+        event
+    ) {
 
         if (
             event.request.method !==
@@ -132,47 +129,57 @@ self.addEventListener(
 
         }
 
+
         event.respondWith(
 
             caches
                 .match(
                     event.request
                 )
-
                 .then(
-                    function (cached) {
+                    function (
+                        cached
+                    ) {
 
-                        if (cached) {
+                        if (
+                            cached
+                        ) {
 
                             return cached;
 
                         }
 
+
                         return fetch(
                             event.request
                         )
-
                         .then(
-                            function (response) {
+                            function (
+                                response
+                            ) {
 
                                 if (
                                     response &&
-                                    response.status === 200 &&
-                                    response.type !== "opaque"
+                                    response.status ===
+                                    200 &&
+                                    response.type !==
+                                    "opaque"
                                 ) {
 
                                     const copy =
                                         response.clone();
 
+
                                     caches
                                         .open(
                                             CACHE_NAME
                                         )
-
                                         .then(
-                                            function (cache) {
+                                            function (
+                                                cache
+                                            ) {
 
-                                                return cache.put(
+                                                cache.put(
                                                     event.request,
                                                     copy
                                                 );
@@ -182,11 +189,11 @@ self.addEventListener(
 
                                 }
 
+
                                 return response;
 
                             }
                         )
-
                         .catch(
                             function () {
 
@@ -200,6 +207,7 @@ self.addEventListener(
                                     );
 
                                 }
+
 
                                 return new Response(
                                     "",
