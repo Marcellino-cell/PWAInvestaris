@@ -1,13 +1,13 @@
 {
     "name": "Sistem Inventaris Ruangan",
     "short_name": "Inventaris",
-    "description": "Sistem Inventaris Ruangan berbasis PWA",
+    "description": "Sistem Inventaris Ruangan modern berbasis PWA",
     "lang": "id-ID",
     "start_url": "index.html",
     "scope": "./",
     "display": "standalone",
     "orientation": "portrait-primary",
-    "background_color": "#020617",
+    "background_color": "#0f172a",
     "theme_color": "#0f172a",
     "icons": [
         {
