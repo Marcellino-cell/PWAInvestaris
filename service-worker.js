@@ -1,73 +1,172 @@
-const CACHE_NAME = "sistem-inventaris-v5-6";
+const CACHE_NAME = "inventaris-it-v2";
 
-const APP_FILES = [
-    "index.html",
-    "style.css",
-    "script.js",
-    "manifest.json",
-    "icon/logo 1.jpeg"
+
+const APP_SHELL = [
+
+  "./",
+
+  "./index.html",
+
+  "./style.css",
+
+  "./script.js",
+
+  "./manifest.json",
+
+  "./icons/icon-192.png",
+
+  "./icons/icon-512.png"
+
 ];
 
-self.addEventListener("install", (event) => {
-    event.waitUntil(
-        caches
-            .open(CACHE_NAME)
-            .then((cache) => cache.addAll(APP_FILES))
-            .then(() => self.skipWaiting())
-    );
-});
 
-self.addEventListener("activate", (event) => {
+self.addEventListener(
+  "install",
+  (event) => {
+
     event.waitUntil(
-        caches
-            .keys()
-            .then((keys) =>
-                Promise.all(
-                    keys
-                        .filter((key) => key !== CACHE_NAME)
-                        .map((key) => caches.delete(key))
-                )
+
+      caches
+
+        .open(
+          CACHE_NAME
+        )
+
+        .then(
+          (cache) =>
+            cache.addAll(
+              APP_SHELL
             )
-            .then(() => self.clients.claim())
-    );
-});
+        )
 
-self.addEventListener("fetch", (event) => {
-    if (event.request.method !== "GET") {
-        return;
+        .then(
+          () =>
+            self.skipWaiting()
+        )
+
+    );
+
+  }
+);
+
+
+self.addEventListener(
+  "activate",
+  (event) => {
+
+    event.waitUntil(
+
+      caches.keys().then(
+        (keys) =>
+          Promise.all(
+
+            keys
+
+              .filter(
+                (key) =>
+                  key !== CACHE_NAME
+              )
+
+              .map(
+                (key) =>
+                  caches.delete(
+                    key
+                  )
+              )
+
+          )
+
+      ).then(
+        () =>
+          self.clients.claim()
+      )
+
+    );
+
+  }
+);
+
+
+self.addEventListener(
+  "fetch",
+  (event) => {
+
+    if (
+      event.request.method !==
+      "GET"
+    ) {
+
+      return;
+
     }
 
+
     event.respondWith(
-        caches.match(event.request).then((cached) => {
+
+      caches
+        .match(
+          event.request
+        )
+
+        .then(
+          (cached) => {
+
             if (cached) {
-                return cached;
+              return cached;
             }
 
-            return fetch(event.request)
-                .then((response) => {
-                    if (
-                        response &&
-                        response.status === 200 &&
-                        response.type !== "opaque"
-                    ) {
-                        const copy = response.clone();
 
-                        caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(event.request, copy);
-                        });
-                    }
+            return fetch(
+              event.request
+            )
 
-                    return response;
-                })
-                .catch(() => {
-                    if (event.request.mode === "navigate") {
-                        return caches.match("index.html");
-                    }
+              .then(
+                (response) => {
 
-                    return new Response("", {
-                        status: 503
-                    });
-                });
-        })
+                  if (
+                    response &&
+                    response.status ===
+                      200 &&
+                    response.type ===
+                      "basic"
+                  ) {
+
+                    const copy =
+                      response.clone();
+
+
+                    caches
+                      .open(
+                        CACHE_NAME
+                      )
+
+                      .then(
+                        (cache) =>
+                          cache.put(
+                            event.request,
+                            copy
+                          )
+                      );
+
+                  }
+
+
+                  return response;
+
+                }
+              )
+
+              .catch(
+                () =>
+                  caches.match(
+                    "./index.html"
+                  )
+              );
+
+          }
+        )
+
     );
-});
+
+  }
+);
