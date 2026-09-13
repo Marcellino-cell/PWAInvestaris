@@ -344,22 +344,34 @@ async function setupFirebaseAuth() {
     await loadFirebaseAuth();
 
 
-    firebaseFns.onAuthStateChanged(
-      firebaseAuth,
-      (user) => {
+firebaseFns.onAuthStateChanged(
+  firebaseAuth,
+  (user) => {
 
-        firebaseUser =
-          user || null;
-
-
-        firebaseAuthReady =
-          true;
+    firebaseUser =
+      user || null;
 
 
-        updateAdminLoginUI();
+    firebaseAuthReady =
+      true;
 
-      }
-    );
+
+    if (user) {
+
+      /*
+       * Login berhasil.
+       * Pulihkan data Admin.
+       */
+
+      restoreAdminInventory();
+
+    }
+
+
+    updateAdminLoginUI();
+
+  }
+);
 
   }
 
@@ -633,6 +645,10 @@ async function loginAdminGoogle() {
    LOGOUT ADMIN
 ========================================================= */
 
+/* =========================================================
+   LOGOUT ADMIN
+========================================================= */
+
 async function logoutAdmin() {
 
   try {
@@ -640,14 +656,33 @@ async function logoutAdmin() {
     await loadFirebaseAuth();
 
 
+    /*
+     * Simpan seluruh data sebelum logout.
+     */
+
+    backupAdminInventory();
+
+
+    /*
+     * Logout Firebase.
+     */
+
     await firebaseFns.signOut(
       firebaseAuth
     );
 
 
+    /*
+     * Setelah logout,
+     * kosongkan data aktif.
+     */
+
+    clearAdminInventorySession();
+
+
     showToast(
       "Logout Berhasil",
-      "Akses Administrator telah dikunci kembali."
+      "Sesi Admin telah berakhir. Data inventaris disembunyikan."
     );
 
   }
@@ -735,6 +770,9 @@ const FOOTER_LINKS = {
 
 const STORAGE_KEY =
   "inventarisIT_data";
+
+const ADMIN_BACKUP_KEY =
+  "inventarisIT_admin_backup";
 
 const THEME_KEY =
   "inventarisIT_theme";
@@ -1503,6 +1541,136 @@ function saveInventory() {
 
 }
 
+/* =========================================================
+   ADMIN DATA SESSION
+========================================================= */
+
+function backupAdminInventory() {
+
+  try {
+
+    localStorage.setItem(
+      ADMIN_BACKUP_KEY,
+      JSON.stringify(
+        inventory
+      )
+    );
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Backup Admin:",
+      error
+    );
+
+  }
+
+}
+
+
+function clearAdminInventorySession() {
+
+  try {
+
+    /*
+     * Simpan data terlebih dahulu
+     * sebelum dikosongkan.
+     */
+
+    backupAdminInventory();
+
+
+    /*
+     * Kosongkan data aktif.
+     */
+
+    inventory = [];
+
+
+    saveInventory();
+
+
+    /*
+     * Refresh seluruh tampilan
+     * supaya dashboard/statistik
+     * langsung menjadi 0.
+     */
+
+    renderAll();
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Clear Admin Session:",
+      error
+    );
+
+  }
+
+}
+
+
+function restoreAdminInventory() {
+
+  try {
+
+    const backup =
+      localStorage.getItem(
+        ADMIN_BACKUP_KEY
+      );
+
+
+    if (!backup) {
+
+      return;
+
+    }
+
+
+    const parsed =
+      JSON.parse(
+        backup
+      );
+
+
+    if (
+      !Array.isArray(
+        parsed
+      )
+    ) {
+
+      return;
+
+    }
+
+
+    inventory =
+      parsed.filter(
+        isValidInventoryRecord
+      );
+
+
+    saveInventory();
+
+
+    renderAll();
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Restore Admin:",
+      error
+    );
+
+  }
+
+}
 
 /* =========================================================
    TOAST
@@ -1925,6 +2093,10 @@ function renderDashboard() {
    RECENT INVENTORY
 ========================================================= */
 
+/* =========================================================
+   RECENT INVENTORY - PREMIUM
+========================================================= */
+
 function renderRecentInventory() {
 
   if (!els.recentInventory) {
@@ -1940,13 +2112,13 @@ function renderRecentInventory() {
           b
         ) =>
           new Date(
-            b.createdAt ||
             b.updatedAt ||
+            b.createdAt ||
             0
           ) -
           new Date(
-            a.createdAt ||
             a.updatedAt ||
+            a.createdAt ||
             0
           )
       )
@@ -1960,9 +2132,9 @@ function renderRecentInventory() {
 
     els.recentInventory.innerHTML = `
 
-      <div class="empty-state">
+      <div class="recent-empty">
 
-        <div class="empty-icon">
+        <div class="recent-empty-icon">
 
           <svg>
             <use href="#icon-box"></use>
@@ -1970,27 +2142,33 @@ function renderRecentInventory() {
 
         </div>
 
-        <strong>
-          Belum ada data
-        </strong>
+        <div>
 
-        <p>
-          Data inventaris akan muncul di sini.
-        </p>
+          <strong>
+            Belum ada inventaris
+          </strong>
+
+          <span>
+            Data terbaru akan muncul di sini.
+          </span>
+
+        </div>
 
       </div>
 
     `;
 
     return;
-
   }
 
 
   els.recentInventory.innerHTML =
     recent
       .map(
-        (item) => {
+        (
+          item,
+          index
+        ) => {
 
           const conditionClass =
             getConditionClass(
@@ -1998,51 +2176,162 @@ function renderRecentInventory() {
             );
 
 
+          const condition =
+            item.condition ||
+            "Baik";
+
+
+          const initials =
+            getInitials(
+              item.name
+            );
+
+
           return `
 
-            <div class="recent-item">
+            <div
+              class="recent-item premium-recent"
+            >
 
-              <div class="recent-item-icon">
+              <!-- RANK -->
 
-                <svg>
-                  <use href="#icon-box"></use>
-                </svg>
-
+              <div
+                class="recent-rank"
+              >
+                ${String(
+                  index + 1
+                ).padStart(
+                  2,
+                  "0"
+                )}
               </div>
 
 
-              <div class="recent-item-info">
+              <!-- ICON -->
 
-                <strong>
+              <div
+                class="recent-item-icon premium-icon"
+              >
+
+                <span>
                   ${escapeHTML(
-                    item.name
-                  )}
-                </strong>
-
-                <small>
-                  ${escapeHTML(
-                    item.room ||
-                    "-"
-                  )}
-                </small>
-
-              </div>
-
-
-              <div class="recent-item-meta">
-
-                <span class="condition-badge ${conditionClass}">
-                  ${escapeHTML(
-                    item.condition ||
-                    "Baik"
+                    initials
                   )}
                 </span>
 
-                <small>
-                  ${formatNumber(
-                    item.quantity
-                  )} unit
-                </small>
+              </div>
+
+
+              <!-- MAIN INFO -->
+
+              <div
+                class="recent-item-info premium-info"
+              >
+
+                <div
+                  class="recent-title-row"
+                >
+
+                  <strong
+                    title="${escapeHTML(
+                      item.name
+                    )}"
+                  >
+                    ${escapeHTML(
+                      item.name
+                    )}
+                  </strong>
+
+                  <span
+                    class="recent-code"
+                  >
+                    ${escapeHTML(
+                      item.code ||
+                      "NO CODE"
+                    )}
+                  </span>
+
+                </div>
+
+
+                <div
+                  class="recent-location"
+                >
+
+                  <svg>
+                    <use
+                      href="#icon-location"
+                    ></use>
+                  </svg>
+
+                  <span>
+                    ${escapeHTML(
+                      item.room ||
+                      "Tidak diketahui"
+                    )}
+                  </span>
+
+                </div>
+
+              </div>
+
+
+              <!-- STATUS -->
+
+              <div
+                class="recent-status"
+              >
+
+                <span
+                  class="recent-condition ${conditionClass}"
+                >
+
+                  <i></i>
+
+                  ${escapeHTML(
+                    condition
+                  )}
+
+                </span>
+
+
+                <span
+                  class="recent-quantity"
+                >
+
+                  <strong>
+                    ${formatNumber(
+                      item.quantity
+                    )}
+                  </strong>
+
+                  <small>
+                    UNIT
+                  </small>
+
+                </span>
+
+              </div>
+
+
+              <!-- DATE -->
+
+              <div
+                class="recent-date"
+              >
+
+                <span>
+                  UPDATE
+                </span>
+
+                <strong>
+                  ${escapeHTML(
+                    formatDate(
+                      item.updatedAt ||
+                      item.createdAt
+                    )
+                  )}
+                </strong>
 
               </div>
 
@@ -2463,19 +2752,23 @@ function editRecord(
     "";
 
 
-  const conditionInput =
-    document.getElementById(
-      "itemCondition"
-    );
+const conditionInputs =
+  document.querySelectorAll(
+    'input[name="condition"]'
+  );
 
+conditionInputs.forEach(
+  (input) => {
 
-  if (conditionInput) {
-
-    conditionInput.value =
-      item.condition ||
-      "Baik";
+    input.checked =
+      input.value ===
+      (
+        item.condition ||
+        "Baik"
+      );
 
   }
+);
 
 
   const descriptionInput =
@@ -2563,15 +2856,14 @@ function handleFormSubmit(
     );
 
 
-  const conditionInput =
-    document.getElementById(
-      "itemCondition"
-    );
+const conditionInput =
+  document.querySelector(
+    'input[name="condition"]:checked'
+  );
 
-
-  const condition =
-    conditionInput?.value ||
-    "Baik";
+const condition =
+  conditionInput?.value ||
+  "Baik";
 
 
   const descriptionInput =
@@ -3151,8 +3443,7 @@ function renderRoomStatistics() {
   }
 
 
-  const rooms =
-    {};
+  const rooms = {};
 
 
   inventory.forEach(
@@ -3185,9 +3476,12 @@ function renderRoomStatistics() {
 
 
       const quantity =
-        Number(
-          item.quantity
-        ) || 0;
+        Math.max(
+          0,
+          Number(
+            item.quantity
+          ) || 0
+        );
 
 
       rooms[room].total +=
@@ -3196,7 +3490,7 @@ function renderRoomStatistics() {
 
       if (
         item.condition ===
-          "Rusak Ringan"
+        "Rusak Ringan"
       ) {
 
         rooms[room].minor +=
@@ -3206,7 +3500,7 @@ function renderRoomStatistics() {
 
       else if (
         item.condition ===
-          "Rusak Berat"
+        "Rusak Berat"
       ) {
 
         rooms[room].major +=
@@ -3238,7 +3532,9 @@ function renderRoomStatistics() {
     );
 
 
-  if (!entries.length) {
+  if (
+    !entries.length
+  ) {
 
     els.roomStatistics.innerHTML = `
 
@@ -3269,67 +3565,168 @@ function renderRoomStatistics() {
   }
 
 
+  const grandTotal =
+    entries.reduce(
+      (
+        total,
+        [, data]
+      ) =>
+        total +
+        data.total,
+      0
+    );
+
+
   els.roomStatistics.innerHTML =
     entries
       .map(
-        ([room, data]) => {
+        (
+          [room, data],
+          index
+        ) => {
 
           const percent =
-            percentage(
-              data.total,
-              getTotals().total
-            );
+            grandTotal > 0
+              ? Math.round(
+                  data.total /
+                  grandTotal *
+                  100
+                )
+              : 0;
 
 
           return `
 
-            <div class="room-stat-item">
+            <div
+              class="room-stat-item premium-room"
+            >
 
-              <div class="room-stat-head">
-
-                <strong>
-                  ${escapeHTML(
-                    room
-                  )}
-                </strong>
-
-                <span>
-                  ${formatNumber(
-                    data.total
-                  )} unit
-                </span>
-
+              <div
+                class="room-rank"
+              >
+                ${String(
+                  index + 1
+                ).padStart(
+                  2,
+                  "0"
+                )}
               </div>
 
 
-              <div class="room-stat-bar">
+              <div
+                class="room-stat-content"
+              >
 
-                <span
-                  style="width:${percent}%"
-                ></span>
+                <div
+                  class="room-stat-head"
+                >
 
-              </div>
+                  <div
+                    class="room-title"
+                  >
+
+                    <span
+                      class="room-status-dot"
+                    ></span>
+
+                    <strong
+                      title="${escapeHTML(
+                        room
+                      )}"
+                    >
+                      ${escapeHTML(
+                        room
+                      )}
+                    </strong>
+
+                  </div>
 
 
-              <div class="room-stat-meta">
+                  <div
+                    class="room-unit"
+                  >
 
-                <span>
-                  Baik ${formatNumber(
-                    data.good
-                  )}
-                </span>
+                    <strong>
+                      ${formatNumber(
+                        data.total
+                      )}
+                    </strong>
 
-                <span>
-                  Ringan ${formatNumber(
-                    data.minor
-                  )}
-                </span>
+                    <span>
+                      UNIT
+                    </span>
 
-                <span>
-                  Berat ${formatNumber(
-                    data.major
-                  )}
-                </span>
+                  </div>
+
+                </div>
+
+
+                <div
+                  class="room-stat-bar"
+                >
+
+                  <span
+                    style="
+                      width:${percent}%
+                    "
+                  ></span>
+
+                </div>
+
+
+                <div
+                  class="room-stat-meta"
+                >
+
+                  <span>
+                    <i
+                      class="meta-dot good"
+                    ></i>
+
+                    Baik
+                    <strong>
+                      ${formatNumber(
+                        data.good
+                      )}
+                    </strong>
+                  </span>
+
+
+                  <span>
+                    <i
+                      class="meta-dot minor"
+                    ></i>
+
+                    Ringan
+                    <strong>
+                      ${formatNumber(
+                        data.minor
+                      )}
+                    </strong>
+                  </span>
+
+
+                  <span>
+                    <i
+                      class="meta-dot major"
+                    ></i>
+
+                    Berat
+                    <strong>
+                      ${formatNumber(
+                        data.major
+                      )}
+                    </strong>
+                  </span>
+
+
+                  <strong
+                    class="room-percent"
+                  >
+                    ${percent}%
+                  </strong>
+
+                </div>
 
               </div>
 
